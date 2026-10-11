@@ -6,7 +6,7 @@
  * nothing here can reach another person's data.
  */
 const API_URL = 'https://jxybttdluexpbwsjzney.supabase.co/functions/v1/api';
-const GOOGLE_CLIENT_ID = '251155354679-bd513101va12f7c1pn0q0g4ajbpmmc2e.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '741282599231-qcp7doaqr32vd44eue2lrp6utijpa3s2.apps.googleusercontent.com';
 const TOKEN_KEY = 'ssa_kundli_idtoken';
 const app = document.getElementById('app');
 
