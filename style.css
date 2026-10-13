@@ -70,13 +70,15 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
   .thread { max-height: 55vh; }
 }
 
-.tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.tools { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; justify-content: flex-end; }
+.tools select, .tools .btn-small { width: auto; flex: 0 0 auto; white-space: nowrap; }
 .tools [hidden] { display: none; }
 body.locked { overflow: hidden; }
 .chat.full { position: fixed; inset: 0; z-index: 20; margin: 0; border-radius: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; border: 0; }
 .chat.full .thread { flex: 1; max-height: none; }
 
-.send-col { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.send-col { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.combine-tick input { width: auto; margin: 0; }
 .combine-tick { display: flex; align-items: center; gap: 6px; font-size: 0.85em; cursor: pointer; white-space: nowrap; }
 .pick { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 15px; font-weight: 500; color: var(--ink); }
 .pick input { width: 18px; height: 18px; flex: none; }
