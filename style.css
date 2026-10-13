@@ -106,7 +106,7 @@ body.locked { overflow: hidden; }
 }
 
 /* The Started and Changes lines under Current period are reference detail: small and grey. */
-.msg p.pline { color: var(--ink-muted); }
+.msg p.pline b { color: var(--ink-muted); }
 
 .installpop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.5); }
 .installpop-card { width: 100%; max-width: 340px; background: var(--surface); border-radius: 16px; padding: 24px 20px 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
