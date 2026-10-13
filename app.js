@@ -72,7 +72,7 @@ async function call(action, payload = {}) {
 
 function showSignIn(message = '') {
   app.innerHTML = `<div class="wrap"><div class="panel"><div class="signin">
-    <h1>Kundli</h1>
+    <h1>Cosmic Math</h1>
     <p class="muted">Enter your birth details and ask the pandit anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
     <div id="gbtn"></div>
@@ -95,7 +95,7 @@ function showSignIn(message = '') {
 
 function showBlocked(message) {
   app.innerHTML = `<div class="wrap"><div class="panel"><div class="signin">
-    <h1>Kundli</h1><p class="error">${esc(message)}</p>
+    <h1>Cosmic Math</h1><p class="error">${esc(message)}</p>
     <button class="btn-secondary" id="blockedOut">Sign out</button></div></div></div>`;
   document.getElementById('blockedOut').addEventListener('click', signOut);
 }
@@ -130,7 +130,7 @@ async function renderList() {
   if (!data) return;
   const items = data.items;
   app.innerHTML = `<div class="wrap">
-    <div class="top"><h1>Kundli</h1><button class="btn-secondary btn-small" id="signOut">Sign out</button></div>
+    <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small" id="signOut">Sign out</button></div>
     <p class="muted">Add yourself and your family members, then ask the pandit about any of them.</p>
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
     ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
