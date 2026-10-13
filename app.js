@@ -290,11 +290,18 @@ async function loadPeople() {
 
 const hintHtml = () => '<p class="hint muted">Ask your first question below. You can follow up on any answer, the pandit remembers this conversation.</p>';
 
+// Best timings sit in their own section, never merged into Period, and carry a caution so they are not read as a promise.
+function bestTimingsHtml(bt) {
+  if (!bt || !Array.isArray(bt.windows) || !bt.windows.length) return '';
+  const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return `<h4 class="h--main">Best timings</h4>${bt.windows.map((w) => `<p><b>${w.strength === 'highest' ? 'Highest chances' : 'Good chances'}:</b> ${mon(w.from)} to ${mon(w.to)}</p>`).join('')}<p class="bt-note">Approximate windows for ${esc(bt.label || 'this matter')}. They depend on the exact birth time and are not a guarantee.</p>`;
+}
+
 function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><h4 class="h--main">Why</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">Period</h4>${a.started ? `<p><b>Started:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p><b>Changes:</b> ${esc(a.timing)}</p>` : ''}` : ''}${a.next ? `<h4 class="h--main">Next phase</h4><p>${esc(a.next)}</p>` : ''}${a.remedy ? `<h4 class="h--main">Remedy</h4><p>${esc(a.remedy)}</p>` : ''}
+    <div class="msg msg--pandit"><h4 class="h--main">Why</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">Period</h4>${a.started ? `<p><b>Started:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p><b>Changes:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings)}${a.next ? `<h4 class="h--main">Next phase</h4><p>${esc(a.next)}</p>` : ''}${a.remedy ? `<h4 class="h--main">Remedy</h4><p>${esc(a.remedy)}</p>` : ''}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
