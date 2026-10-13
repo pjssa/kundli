@@ -324,7 +324,7 @@ async function loadPeople() {
 // '' means automatic: the pandit answers in the language the question is written in.
 const LANGS = [['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو'], ['en', 'English']];
 const L_EN = {
-  why: 'Why', period: 'Period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'Highest chances', goodChances: 'Good chances',
+  why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || ''; } catch { return ''; } })();
@@ -340,7 +340,13 @@ function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
   const wins = bt && Array.isArray(bt.windows) ? bt.windows : [];
   if (!wins.length && !next) return '';
   const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(`${loc || 'en'}-IN`, { month: 'short', year: 'numeric', timeZone: 'UTC' });
-  return `<h4 class="h--main">${esc(L.bestTimings)}</h4>${next ? `<p>${esc(next)}</p>` : ''}${wins.map((w) => `<p><b>${esc(w.strength === 'highest' ? L.highestChances : L.goodChances)}:</b> ${mon(w.from)} \u2013 ${mon(w.to)}</p>`).join('')}${wins.length ? `<p class="bt-note">${esc(L.approxNote)}</p>` : ''}`;
+  // KP supports the topic: dated sentences for the window(s). Otherwise the AI's line on the next favourable stretch.
+  const sentence = (w) => {
+    const key = w.strength === 'highest' ? 'highestChances' : 'goodChances';
+    const tpl = L[key] && L[key].includes('{from}') && L[key].includes('{to}') ? L[key] : L_EN[key];
+    return tpl.replace('{from}', mon(w.from)).replace('{to}', mon(w.to));
+  };
+  return `<h4 class="h--main">${esc(L.bestTimings)}</h4>${wins.length ? `${wins.map((w) => `<p>${esc(sentence(w))}</p>`).join('')}<p class="bt-note">${esc(L.approxNote)}</p>` : `<p>${esc(next)}</p>`}`;
 }
 
 function answerHtml(e) {
