@@ -92,7 +92,10 @@ function showSignIn(message = '') {
         const gp = jwtPayload(r.credential);
         if (gp) setProfile({ name: gp.name || '', email: String(gp.email || '').toLowerCase(), picture: gp.picture || '' });
         // Trade the Google token for a long-lived device session; if that fails this visit simply keeps using Google's.
-        try { const out = await call('kundliPublic_remember', { deviceLabel: deviceLabelGuess() }); setSession(out.sessionToken, out.expiresAt); } catch { /* keep the Google token */ }
+        // The first call after a quiet spell can fail while the server wakes up; call() drops the token on that failure, so it is put back for a second try instead of bouncing a good sign-in to this screen.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try { const out = await call('kundliPublic_remember', { deviceLabel: deviceLabelGuess() }); setSession(out.sessionToken, out.expiresAt); break; } catch { setToken(r.credential); }
+        }
         renderList();
       },
     });
