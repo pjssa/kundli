@@ -384,7 +384,7 @@ async function loadPeople() {
 const LANGS = [['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو'], ['en', 'English']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
-  approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy',
+  approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', disclaimer: 'This is a prediction, not a guarantee.',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || ''; } catch { return ''; } })();
 const setLang = (c) => { lang = c; try { if (c) localStorage.setItem('kundliLang', c); else localStorage.removeItem('kundliLang'); } catch { /* ignore */ } };
@@ -398,7 +398,8 @@ const hintHtml = () => '<p class="hint muted">Ask your first question below. You
 function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
   const wins = bt && Array.isArray(bt.windows) ? bt.windows : [];
   if (!wins.length && !next) return '';
-  const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(`${loc || 'en'}-IN`, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  // Health windows carry the day as well, other topics stay at month level.
+  const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(`${loc || 'en'}-IN`, { ...(bt && bt.matter === 'health' ? { day: 'numeric' } : {}), month: 'short', year: 'numeric', timeZone: 'UTC' });
   // KP supports the topic: dated sentences for the window(s). Otherwise the AI's line on the next favourable stretch.
   const sentence = (w) => {
     const key = w.strength === 'highest' ? 'highestChances' : 'goodChances';
@@ -413,7 +414,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><h4 class="h--main">${esc(L.why)}</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
+    <div class="msg msg--pandit"><h4 class="h--main">${esc(L.why)}</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}<p class="bt-note disc">${esc(L.disclaimer || L_EN.disclaimer)}</p>
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }

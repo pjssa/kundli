@@ -124,3 +124,5 @@ body.locked { overflow: hidden; }
 @media (max-width: 400px) { .chat.full .tools .lg { display: none; } }
 /* The footer already has the language button; the header one is for full screen, where the footer is out of reach. */
 .chat:not(.full) #langTop { display: none; }
+
+.msg .disc { margin-top: 18px; }
