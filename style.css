@@ -108,9 +108,11 @@ body.locked { overflow: hidden; }
 /* The Started and Changes lines under Current period are reference detail: small and grey. */
 .msg p.pline { font-size: 13px; color: var(--ink-muted); }
 
-.installbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border-strong); font-size: 14px; line-height: 1.35; }
-.installbar-text { flex: 1; min-width: 0; }
-.installbar-x { background: none; border: 0; font-size: 24px; line-height: 1; padding: 4px 8px; color: var(--ink-muted); cursor: pointer; }
+.installpop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.5); }
+.installpop-card { width: 100%; max-width: 340px; background: var(--surface); border-radius: 16px; padding: 24px 20px 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+.installpop-card img { border-radius: 14px; margin-bottom: 8px; }
+.installpop-card h2 { margin: 0 0 6px; font-size: 20px; }
+.installpop-card p { margin: 0 0 16px; font-size: 15px; line-height: 1.45; }
 
 @media (max-width: 600px) {
   /* Title and the three buttons stay on one row in the chat header, also in full screen. */

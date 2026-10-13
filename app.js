@@ -538,28 +538,36 @@ function openModal(k, done) {
 if (getSession() || currentToken()) renderList(); else showSignIn();
 
 // ---------------------------------------------------------------- add to home screen
-// Phones are asked on every visit until the page is running as an installed app. Chrome and Edge offer a real
-// install button; iPhone Safari and other browsers have no such API, so they get the manual steps instead.
+// Phones get a popup on every visit until the page runs as an installed app. Chrome and Edge install from the popup's own
+// button (the browser then shows its one confirmation); iPhone Safari and other browsers cannot be installed from a page,
+// so for them the popup shows the two taps to make instead.
 let installEvent = null;
-function installBanner() {
+function installPopup() {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   if (standalone || !window.matchMedia('(max-width: 600px)').matches) return;
   try { if (sessionStorage.getItem('kundliInstallDismissed')) return; } catch { /* ask again */ }
-  let bar = document.getElementById('installBar');
-  if (!bar) { bar = document.createElement('div'); bar.id = 'installBar'; bar.className = 'installbar'; app.before(bar); }
-  const ua = navigator.userAgent || '';
-  const ios = /iPhone|iPad|iPod/.test(ua);
-  const how = installEvent ? '' : ios
-    ? '<span class="muted">Tap the Share button, then <b>Add to Home Screen</b>.</span>'
-    : '<span class="muted">Open the browser menu, then choose <b>Add to Home screen</b>.</span>';
-  bar.innerHTML = `<div class="installbar-text"><b>Add Cosmic Math to your home screen</b>${how ? `<br>${how}` : ''}</div>${installEvent ? '<button type="button" class="btn-primary btn-small" id="installGo">Add</button>' : ''}<button type="button" class="installbar-x" id="installX" aria-label="Not now">&times;</button>`;
-  document.getElementById('installX').addEventListener('click', () => { try { sessionStorage.setItem('kundliInstallDismissed', '1'); } catch { /* ignore */ } bar.remove(); });
+  let pop = document.getElementById('installPop');
+  if (!pop) { pop = document.createElement('div'); pop.id = 'installPop'; pop.className = 'installpop'; document.body.appendChild(pop); }
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+  const how = ios
+    ? 'Tap the <b>Share</b> button at the bottom of Safari, then choose <b>Add to Home Screen</b>.'
+    : 'Open your browser menu (&#8942;), then choose <b>Add to Home screen</b> or <b>Install app</b>.';
+  pop.innerHTML = `<div class="installpop-card" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+    <img src="icons/icon-192.png" alt="" width="64" height="64" />
+    <h2 id="installTitle">Install CosmicMath</h2>
+    <p class="muted">${installEvent ? 'Keep it on your home screen and open it like an app.' : how}</p>
+    <div class="actions" style="justify-content:center;">
+      ${installEvent ? '<button type="button" class="btn-primary" id="installGo">Install</button>' : ''}
+      <button type="button" class="btn-secondary" id="installX">${installEvent ? 'Not now' : 'Got it'}</button>
+    </div></div>`;
+  const close = () => { try { sessionStorage.setItem('kundliInstallDismissed', '1'); } catch { /* ignore */ } pop.remove(); };
+  document.getElementById('installX').addEventListener('click', close);
   document.getElementById('installGo')?.addEventListener('click', async () => {
-    const ev = installEvent; installEvent = null; bar.remove();
+    const ev = installEvent; installEvent = null; pop.remove();
     try { await ev.prompt(); } catch { /* the browser declined to show it */ }
   });
 }
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; installBanner(); });
-window.addEventListener('appinstalled', () => document.getElementById('installBar')?.remove());
-installBanner();
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; installPopup(); });
+window.addEventListener('appinstalled', () => document.getElementById('installPop')?.remove());
+installPopup();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* installing still works from the browser menu */ });
