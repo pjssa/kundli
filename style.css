@@ -35,7 +35,9 @@ button:disabled { opacity: 0.55; cursor: default; }
 .tile b { display: block; margin-bottom: 4px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
-.thread { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; min-height: 120px; overflow-y: auto; padding: 4px 2px; }
+/* The logo in its original colours, translucent: the picture and the area around it are one pre-blended surface, so no edge shows, wide or tall. */
+.thread { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; min-height: 120px; overflow-y: auto; padding: 12px 10px; border-radius: var(--radius-lg); background: #adaeb2 url('icons/chat-bg.png') center / contain no-repeat; }
+.thread > .hint { color: var(--ink); }
 .msg { max-width: 85%; padding: 10px 14px; border-radius: var(--radius-lg); overflow-wrap: anywhere; }
 .msg p { margin: 0; line-height: 1.5; white-space: pre-line; }
 .msg p + p { margin-top: 8px; }
