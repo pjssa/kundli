@@ -45,10 +45,10 @@ button:disabled { opacity: 0.55; cursor: default; }
 .msg--me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
 .msg--pandit { align-self: flex-start; background: var(--surface); border: 1px solid var(--border-strong); border-bottom-left-radius: 4px; }
 .msg h4 { margin: 10px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
-.msg .bt-note { font-size: 12px; color: var(--ink-muted); }
+.msg .bt-note { color: var(--ink); font-weight: 400; }
 .msg h4.h--main { color: var(--ink); }
 .msg h4:first-child { margin-top: 0; }
-.msg .basis { font-size: 12px; color: var(--ink-muted); }
+.msg .basis { color: var(--ink); font-weight: 400; }
 .msg .del { margin-top: 6px; font-size: 12px; color: var(--ink-muted); }
 .hint { margin: auto; text-align: center; }
 .composer { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; }
@@ -106,7 +106,7 @@ body.locked { overflow: hidden; }
 }
 
 /* The Started and Changes lines under Current period are reference detail: small and grey. */
-.msg p.pline { font-size: 13px; color: var(--ink-muted); }
+.msg p.pline { color: var(--ink-muted); }
 
 .installpop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.5); }
 .installpop-card { width: 100%; max-width: 340px; background: var(--surface); border-radius: 16px; padding: 24px 20px 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
