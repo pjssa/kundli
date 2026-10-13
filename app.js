@@ -446,7 +446,7 @@ function planetTableHtml(chart) {
 
 // ---------------------------------------------------------------- footer: feedback and language
 function footerHtml() {
-  return `<div class="footer-actions"><button type="button" class="btn-secondary" id="fbBtn">Feedback, complaint or idea</button><button type="button" class="btn-secondary" id="langBtn">Answer in your language${lang ? ` (${esc(langName(lang))})` : ''}</button></div>`;
+  return `<div class="footer-actions"><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button><button type="button" class="btn-secondary" id="langBtn">Answer in your language${lang ? ` (${esc(langName(lang))})` : ''}</button></div>`;
 }
 function wireFooter() {
   document.getElementById('fbBtn')?.addEventListener('click', openFeedback);
