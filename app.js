@@ -86,6 +86,8 @@ function showSignIn(message = '') {
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: async (r) => {
+        // A fresh Google sign-in replaces any remembered session on this device, or the old account's session would answer the next call.
+        clearSession();
         setToken(r.credential);
         const gp = jwtPayload(r.credential);
         if (gp) setProfile({ name: gp.name || '', email: String(gp.email || '').toLowerCase(), picture: gp.picture || '' });
