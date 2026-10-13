@@ -32,19 +32,38 @@ function getToken() {
 }
 function setToken(t) { try { sessionStorage.setItem(TOKEN_KEY, t); } catch { memoryToken = t; } }
 let memoryToken = '';
+// After one Google sign-in the device is handed a long-lived session (90 days, sliding) that is sent instead of
+// the Google token, which expires in about an hour; so a device that has signed in once stays signed in.
+const SESSION_KEY = 'ssa_kundli_session';
+function getSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (s && s.token && new Date(s.expiresAt).getTime() > Date.now() + 60000) return s.token;
+    localStorage.removeItem(SESSION_KEY);
+  } catch { /* storage blocked: the person signs in again next visit */ }
+  return '';
+}
+const setSession = (token, expiresAt) => { try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiresAt })); } catch { /* ignore */ } };
+const clearSession = () => { try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ } };
+function deviceLabelGuess() {
+  const ua = navigator.userAgent || '';
+  const os = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Device';
+  return `${/CriOS|Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'Browser'} on ${os}`;
+}
 const currentToken = () => getToken() || (memoryToken && (jwtPayload(memoryToken)?.exp * 1000 > Date.now() ? memoryToken : ''));
 
 class AuthError extends Error {}
 class AccessError extends Error {}
 
 async function call(action, payload = {}) {
-  const kundliIdToken = currentToken();
-  if (!kundliIdToken) throw new AuthError('Please sign in with Google');
-  const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, payload, kundliIdToken }) });
+  const sessionToken = getSession();
+  const kundliIdToken = sessionToken ? '' : currentToken();
+  if (!sessionToken && !kundliIdToken) throw new AuthError('Please sign in with Google');
+  const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, payload, ...(sessionToken ? { kundliSessionToken: sessionToken } : { kundliIdToken }) }) });
   let parsed;
   try { parsed = await res.json(); } catch { throw new Error('Unexpected response from server'); }
   if (!parsed.ok) {
-    if (parsed.error?.code === 'AUTH_INVALID_TOKEN') { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } memoryToken = ''; throw new AuthError(parsed.error.message); }
+    if (parsed.error?.code === 'AUTH_INVALID_TOKEN') { clearSession(); try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } memoryToken = ''; throw new AuthError(parsed.error.message); }
     if (parsed.error?.code === 'ACCESS_DISABLED') throw new AccessError(parsed.error.message);
     throw new Error(parsed.error?.message || 'Something went wrong');
   }
@@ -54,14 +73,19 @@ async function call(action, payload = {}) {
 function showSignIn(message = '') {
   app.innerHTML = `<div class="wrap"><div class="panel"><div class="signin">
     <h1>Kundli</h1>
-    <p class="muted">Enter your birth details and ask the pandit anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save.</p>
+    <p class="muted">Enter your birth details and ask the pandit anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
     <div id="gbtn"></div>
   </div></div></div>`;
   const init = () => {
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
-      callback: (r) => { setToken(r.credential); renderList(); },
+      callback: async (r) => {
+        setToken(r.credential);
+        // Trade the Google token for a long-lived device session; if that fails this visit simply keeps using Google's.
+        try { const out = await call('kundliPublic_remember', { deviceLabel: deviceLabelGuess() }); setSession(out.sessionToken, out.expiresAt); } catch { /* keep the Google token */ }
+        renderList();
+      },
     });
     window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with' });
   };
@@ -76,7 +100,10 @@ function showBlocked(message) {
   document.getElementById('blockedOut').addEventListener('click', signOut);
 }
 
-function signOut() {
+async function signOut() {
+  const session = getSession();
+  if (session) { try { await call('kundliPublic_logout', { sessionToken: session }); } catch { /* the device is signed out here either way */ } }
+  clearSession();
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
   memoryToken = '';
   window.google?.accounts?.id?.disableAutoSelect();
@@ -96,7 +123,7 @@ async function guarded(fn) {
 
 async function renderList() {
   peopleCache = null;
-  if (!currentToken()) return showSignIn();
+  if (!getSession() && !currentToken()) return showSignIn();
   app.innerHTML = `<div class="wrap"><p class="muted">Loading&hellip;</p></div>`;
   let data;
   try { data = await guarded(() => call('kundliPublic_list')); } catch (err) { app.innerHTML = `<div class="wrap"><p class="error">${esc(err.message)}</p></div>`; return; }
@@ -476,4 +503,4 @@ function openModal(k, done) {
   });
 }
 
-if (currentToken()) renderList(); else showSignIn();
+if (getSession() || currentToken()) renderList(); else showSignIn();
