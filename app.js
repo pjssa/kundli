@@ -191,7 +191,7 @@ async function renderDetail(kundliId) {
     <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
 
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;">Ask CosmicMath</h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="vastu" title="Directions for home, shop and office from this chart">Vastu</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
+      <div class="top"><h2 style="margin:0;">Ask CosmicMath</h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
@@ -367,12 +367,6 @@ async function renderDetail(kundliId) {
       if (!thread.querySelector('.picker')) sendBtn.disabled = false;
       toBottom();
     }
-  });
-  // The server recognises a Vastu question and adds the direction facts from the chart.
-  document.getElementById('vastu').addEventListener('click', () => {
-    if (sendBtn.disabled) return;
-    qBox.value = 'Vastu guidance for me: the best directions and spaces for my home, shop and office';
-    document.getElementById('askForm').requestSubmit();
   });
 }
 
