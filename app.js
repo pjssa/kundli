@@ -108,8 +108,11 @@ async function renderList() {
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
     ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
+    ${footerHtml()}
   </div>`;
   document.getElementById('signOut').addEventListener('click', signOut);
+  onLangChange = null;
+  wireFooter();
   document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
   app.querySelectorAll('[data-open]').forEach((el) => {
     const go = () => renderDetail(el.dataset.open);
@@ -126,6 +129,8 @@ async function renderDetail(kundliId) {
   try { data = await guarded(() => call('kundliPublic_get', { kundliId })); } catch (err) { app.innerHTML = `<div class="wrap"><p class="error">${esc(err.message)}</p><button class="btn-secondary" id="back">Back</button></div>`; document.getElementById('back').addEventListener('click', renderList); return; }
   if (!data) return;
   const { kundli: k, chart, history } = data;
+  let hist = [...history];
+  onLangChange = null;
 
   app.innerHTML = `<div class="wrap">
     <button class="btn-link" id="back">&larr; Everyone</button>
@@ -134,8 +139,9 @@ async function renderDetail(kundliId) {
     <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
 
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;">Ask the pandit</h2><div class="tools"><button class="btn-secondary btn-small" id="clear" ${history.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full screen</button></div></div>
-      <div class="thread" id="thread" aria-live="polite">${history.length ? [...history].reverse().map(answerHtml).join('') : hintHtml()}</div>
+      <div class="top"><h2 style="margin:0;">Ask the pandit</h2><div class="tools"><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full screen</button></div></div>
+      <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
+      <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
       <form class="composer" id="askForm">
         <textarea id="q" rows="1" placeholder="Ask anything, e.g. Will I get a promotion this year?"></textarea>
@@ -147,7 +153,9 @@ async function renderDetail(kundliId) {
     </div>
 
     <div class="panel"><details><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
+    ${footerHtml()}
   </div>`;
+  wireFooter();
 
   document.getElementById('back').addEventListener('click', renderList);
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
@@ -167,7 +175,25 @@ async function renderDetail(kundliId) {
     clearBtn.hidden = !has;
     if (!has && !thread.querySelector('.hint')) thread.innerHTML = hintHtml();
   };
-  toBottom();
+  // Re-draw the thread in the chosen reading language; translations are fetched (and cached server-side) for the newest answers.
+  const refreshLanguage = async () => {
+    if (lang && lang !== 'en' && hist.length) {
+      const status = document.getElementById('langStatus');
+      if (status) { status.textContent = 'Translating\u2026'; status.hidden = false; }
+      try {
+        const out = await guarded(() => call('kundliPublic_translate', { kundliId: k.kundliId, language: lang, askedAts: hist.slice(0, 6).map((x) => x.askedAt) }));
+        if (out) { labelCache.set(lang, out.labels); out.items.forEach((it) => trCache.set(`${lang}|${it.askedAt}`, it)); }
+      } catch (err) {
+        const errEl = document.getElementById('askErr');
+        if (errEl) { errEl.textContent = err.message; errEl.hidden = false; }
+      } finally { if (status) status.hidden = true; }
+    }
+    thread.innerHTML = hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml();
+    clearBtn.hidden = !hist.length;
+    toBottom();
+  };
+  onLangChange = refreshLanguage;
+  if (lang && lang !== 'en') refreshLanguage(); else toBottom();
   // CSS-driven full screen (the browser Fullscreen API is not available on iPhones).
   const chat = document.getElementById('chat');
   const fullBtn = document.getElementById('full');
@@ -188,12 +214,12 @@ async function renderDetail(kundliId) {
     const btn = ev.target.closest('[data-del]');
     if (!btn || !window.confirm('Delete this question and its answer?')) return;
     btn.disabled = true;
-    try { await guarded(() => call('kundliPublic_deleteAnswers', { kundliId: k.kundliId, askedAt: btn.dataset.del })); btn.closest('.ans').remove(); syncBar(); } catch (err) { alert(err.message); btn.disabled = false; }
+    try { await guarded(() => call('kundliPublic_deleteAnswers', { kundliId: k.kundliId, askedAt: btn.dataset.del })); btn.closest('.ans').remove(); hist = hist.filter((x) => x.askedAt !== btn.dataset.del); syncBar(); } catch (err) { alert(err.message); btn.disabled = false; }
   });
   clearBtn.addEventListener('click', async () => {
     if (!window.confirm('Delete the whole chat for this person? This cannot be undone.')) return;
     clearBtn.disabled = true;
-    try { await guarded(() => call('kundliPublic_deleteAnswers', { kundliId: k.kundliId, all: true })); thread.innerHTML = ''; syncBar(); } catch (err) { alert(err.message); }
+    try { await guarded(() => call('kundliPublic_deleteAnswers', { kundliId: k.kundliId, all: true })); thread.innerHTML = ''; hist = []; syncBar(); } catch (err) { alert(err.message); }
     clearBtn.disabled = false;
   });
   const grow = () => { qBox.style.height = 'auto'; qBox.style.height = `${Math.min(qBox.scrollHeight, 140)}px`; };
@@ -220,11 +246,11 @@ async function renderDetail(kundliId) {
       box.querySelectorAll('button, input').forEach((n) => { n.disabled = true; });
       box.innerHTML = '<p class="muted">The pandit is studying the charts&hellip;</p>';
       try {
-        const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids }));
+        const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined }));
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
         if (!out) return;
-        thread.insertAdjacentHTML('beforeend', answerHtml(out.entry));
-        clearBtn.hidden = false;
+        hist.unshift(out.entry);
+        await refreshLanguage();
       } catch (err) {
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
         qBox.value = question; grow();
@@ -260,11 +286,11 @@ async function renderDetail(kundliId) {
           return;
         }
       }
-      const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question }));
+      const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined }));
       dropPending();
       if (!out) return;
-      thread.insertAdjacentHTML('beforeend', answerHtml(out.entry));
-      clearBtn.hidden = false;
+      hist.unshift(out.entry);
+      await refreshLanguage();
     } catch (err) {
       dropPending();
       qBox.value = question; grow();
@@ -288,20 +314,37 @@ async function loadPeople() {
   return peopleCache;
 }
 
+// ---------------------------------------------------------------- reading language
+// '' means automatic: the pandit answers in the language the question is written in.
+const LANGS = [['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو'], ['en', 'English']];
+const L_EN = {
+  why: 'Why', period: 'Period', started: 'Started', changes: 'Changes', bestTimings: 'Best timings', highestChances: 'Highest chances', goodChances: 'Good chances',
+  approxNote: 'Approximate windows for {topic}. They depend on the exact birth time and are not a guarantee.', nextPhase: 'Next phase', remedy: 'Remedy',
+};
+let lang = (() => { try { return localStorage.getItem('kundliLang') || ''; } catch { return ''; } })();
+const setLang = (c) => { lang = c; try { if (c) localStorage.setItem('kundliLang', c); else localStorage.removeItem('kundliLang'); } catch { /* ignore */ } };
+const langName = (c) => (LANGS.find((l) => l[0] === c) || [c, c])[1];
+const trCache = new Map();
+const labelCache = new Map();
+const trOf = (e) => (lang && lang !== 'en' ? trCache.get(`${lang}|${e.askedAt}`) : null);
+let onLangChange = null;
+
 const hintHtml = () => '<p class="hint muted">Ask your first question below. You can follow up on any answer, the pandit remembers this conversation.</p>';
 
 // Best timings sit in their own section, never merged into Period, and carry a caution so they are not read as a promise.
-function bestTimingsHtml(bt) {
+function bestTimingsHtml(bt, L = L_EN, topic = '') {
   if (!bt || !Array.isArray(bt.windows) || !bt.windows.length) return '';
-  const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-  return `<h4 class="h--main">Best timings</h4>${bt.windows.map((w) => `<p><b>${w.strength === 'highest' ? 'Highest chances' : 'Good chances'}:</b> ${mon(w.from)} to ${mon(w.to)}</p>`).join('')}<p class="bt-note">Approximate windows for ${esc(bt.label || 'this matter')}. They depend on the exact birth time and are not a guarantee.</p>`;
+  const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(`${lang || 'en'}-IN`, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return `<h4 class="h--main">${esc(L.bestTimings)}</h4>${bt.windows.map((w) => `<p><b>${esc(w.strength === 'highest' ? L.highestChances : L.goodChances)}:</b> ${mon(w.from)} – ${mon(w.to)}</p>`).join('')}<p class="bt-note">${esc(L.approxNote.replace('{topic}', topic || bt.label || 'this matter'))}</p>`;
 }
 
 function answerHtml(e) {
-  const a = e.answer || {};
+  const t = trOf(e);
+  const L = t ? (labelCache.get(lang) || L_EN) : L_EN;
+  const a = t ? { ...(e.answer || {}), ...t.answer } : (e.answer || {});
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
-    <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><h4 class="h--main">Why</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">Period</h4>${a.started ? `<p><b>Started:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p><b>Changes:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings)}${a.next ? `<h4 class="h--main">Next phase</h4><p>${esc(a.next)}</p>` : ''}${a.remedy ? `<h4 class="h--main">Remedy</h4><p>${esc(a.remedy)}</p>` : ''}
+    <div class="msg msg--me"><p>${esc(t?.question || e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
+    <div class="msg msg--pandit"><h4 class="h--main">${esc(L.why)}</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, t?.topic)}${a.next ? `<h4 class="h--main">${esc(L.nextPhase)}</h4><p>${esc(a.next)}</p>` : ''}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
@@ -320,6 +363,66 @@ function planetTableHtml(chart) {
 }
 
 // ---------------------------------------------------------------- add / edit
+
+// ---------------------------------------------------------------- footer: feedback and language
+function footerHtml() {
+  return `<div class="footer-actions"><button type="button" class="btn-secondary" id="fbBtn">Feedback, complaint or idea</button><button type="button" class="btn-secondary" id="langBtn">Read in your language${lang ? ` (${esc(langName(lang))})` : ''}</button></div>`;
+}
+function wireFooter() {
+  document.getElementById('fbBtn')?.addEventListener('click', openFeedback);
+  document.getElementById('langBtn')?.addEventListener('click', openLanguage);
+}
+function overlayPanel(html) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:10;';
+  overlay.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin-top:24px;">${html}</div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  return overlay;
+}
+function openFeedback() {
+  const o = overlayPanel(`<h2>Tell us</h2>
+    <form id="fb">
+      <label>What is this about?<select name="kind"><option value="feedback">Feedback</option><option value="complaint">Complaint</option><option value="feature">Feature request</option></select></label>
+      <label>Your message<textarea name="message" rows="5" maxlength="2000" required placeholder="Write in any language"></textarea></label>
+      <p class="error" id="fbErr" hidden></p>
+      <p class="muted" id="fbOk" hidden>Thank you. Your message has reached us.</p>
+      <div class="actions"><button type="button" class="btn-secondary" id="fbCancel">Close</button><button type="submit" class="btn-primary">Send</button></div>
+    </form>`);
+  o.querySelector('#fbCancel').addEventListener('click', () => o.remove());
+  o.querySelector('#fb').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const err = o.querySelector('#fbErr');
+    err.hidden = true;
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const out = await guarded(() => call('kundliPublic_feedback', { kind: fd.get('kind'), message: fd.get('message') }));
+      if (!out) { o.remove(); return; }
+      e.target.querySelector('textarea').value = '';
+      o.querySelector('#fbOk').hidden = false;
+    } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+    btn.disabled = false;
+  });
+}
+function openLanguage() {
+  const o = overlayPanel(`<h2>Read in your language</h2>
+    <p class="muted">Answers are shown in the language you pick, and new questions are answered in it. With no choice, the pandit answers in the language you write the question in.</p>
+    <div class="actions" style="flex-wrap:wrap;">
+      <button type="button" class="btn-secondary btn-small" data-lang="">${lang ? '' : '&#10003; '}Same as my question</button>
+      ${LANGS.map(([c, n]) => `<button type="button" class="btn-secondary btn-small" data-lang="${c}">${lang === c ? '&#10003; ' : ''}${esc(n)}</button>`).join('')}
+    </div>
+    <div class="actions"><button type="button" class="btn-secondary" id="langCancel">Close</button></div>`);
+  o.querySelector('#langCancel').addEventListener('click', () => o.remove());
+  o.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
+    setLang(b.dataset.lang);
+    o.remove();
+    const lb = document.getElementById('langBtn');
+    if (lb) lb.textContent = `Read in your language${lang ? ` (${langName(lang)})` : ''}`;
+    onLangChange?.();
+  }));
+}
 
 function openModal(k, done) {
   const isEdit = !!k;

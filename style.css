@@ -81,3 +81,5 @@ body.locked { overflow: hidden; }
 
 .perperson { margin: 8px 0 0; padding-left: 18px; line-height: 1.5; }
 .perperson li { margin: 3px 0; }
+
+.footer-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 24px 0 8px; }
