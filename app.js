@@ -43,6 +43,11 @@ function getSession() {
   } catch { /* storage blocked: the person signs in again next visit */ }
   return '';
 }
+// Who is signed in, for the avatar on the Sign out button. The picture only comes with a fresh Google sign-in, so it is kept on the device.
+const PROFILE_KEY = 'ssa_kundli_profile';
+function getProfile() { try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null') || {}; } catch { return {}; } }
+const setProfile = (p) => { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch { /* ignore */ } };
+const clearProfile = () => { try { localStorage.removeItem(PROFILE_KEY); } catch { /* ignore */ } };
 const setSession = (token, expiresAt) => { try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiresAt })); } catch { /* ignore */ } };
 const clearSession = () => { try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ } };
 function deviceLabelGuess() {
@@ -82,6 +87,8 @@ function showSignIn(message = '') {
       client_id: GOOGLE_CLIENT_ID,
       callback: async (r) => {
         setToken(r.credential);
+        const gp = jwtPayload(r.credential);
+        if (gp) setProfile({ name: gp.name || '', email: String(gp.email || '').toLowerCase(), picture: gp.picture || '' });
         // Trade the Google token for a long-lived device session; if that fails this visit simply keeps using Google's.
         try { const out = await call('kundliPublic_remember', { deviceLabel: deviceLabelGuess() }); setSession(out.sessionToken, out.expiresAt); } catch { /* keep the Google token */ }
         renderList();
@@ -104,6 +111,7 @@ async function signOut() {
   const session = getSession();
   if (session) { try { await call('kundliPublic_logout', { sessionToken: session }); } catch { /* the device is signed out here either way */ } }
   clearSession();
+  clearProfile();
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
   memoryToken = '';
   window.google?.accounts?.id?.disableAutoSelect();
@@ -121,6 +129,13 @@ async function guarded(fn) {
 
 // ---------------------------------------------------------------- list
 
+const initialOf = (w) => (String(w.name || w.email || '?').trim()[0] || '?').toUpperCase();
+function avatarHtml(w) {
+  return w.picture
+    ? `<img class="avatar" src="${esc(w.picture)}" alt="" width="24" height="24" referrerpolicy="no-referrer" />`
+    : `<span class="avatar avatar--initial" aria-hidden="true">${esc(initialOf(w))}</span>`;
+}
+
 async function renderList() {
   peopleCache = null;
   if (!getSession() && !currentToken()) return showSignIn();
@@ -129,8 +144,11 @@ async function renderList() {
   try { data = await guarded(() => call('kundliPublic_list')); } catch (err) { app.innerHTML = `<div class="wrap"><p class="error">${esc(err.message)}</p></div>`; return; }
   if (!data) return;
   const items = data.items;
+  const prof = getProfile();
+  const me = data.me || {};
+  const who = { email: me.email || prof.email || '', name: me.name || prof.name || '', picture: prof.email && me.email && prof.email !== me.email ? '' : (prof.picture || '') };
   app.innerHTML = `<div class="wrap">
-    <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small" id="signOut">Sign out</button></div>
+    <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>
     <p class="muted">Add yourself and your family members, then ask the pandit about any of them.</p>
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
     ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
@@ -138,6 +156,8 @@ async function renderList() {
     ${footerHtml()}
   </div>`;
   document.getElementById('signOut').addEventListener('click', signOut);
+  // A picture that fails to load (blocked, expired link) falls back to the letter.
+  document.querySelector('#signOut img.avatar')?.addEventListener('error', (e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar avatar--initial', textContent: initialOf(who) })); });
   onLangChange = null;
   wireFooter();
   document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
