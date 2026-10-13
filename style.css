@@ -9,7 +9,8 @@
   --radius-md: 12px; --radius-lg: 16px;
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: var(--font-ui); background: var(--bg); color: var(--ink); }
+/* Plain white page; the logo artwork lives only inside the chat. */
+body { margin: 0; font-family: var(--font-ui); background: #fff; color: var(--ink); }
 .wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 40px; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .top h1 { font-size: 22px; margin: 0; }
@@ -97,9 +98,6 @@ body.locked { overflow: hidden; }
   .thread { max-height: none; height: clamp(420px, calc(100vh - 380px), 900px); }
   .msg { max-width: min(78%, 900px); }
   .chart { max-width: 520px; }
-  /* The same artwork as the chat, lighter, behind the whole page; it stays put while the page scrolls. */
-  .wrap > p.muted { color: #3a444e; }
-  body { background: #c6c8ca url('icons/page-bg.png') center / contain no-repeat fixed; }
 }
 
 /* The Started and Changes lines under Current period are reference detail: small and grey. */
