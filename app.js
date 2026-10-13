@@ -294,7 +294,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><h4>Why</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4>Period</h4>${a.started ? `<p><b>Started:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p><b>Changes:</b> ${esc(a.timing)}</p>` : ''}` : ''}${a.next ? `<h4>Next phase</h4><p>${esc(a.next)}</p>` : ''}${a.remedy ? `<h4>Remedy</h4><p>${esc(a.remedy)}</p>` : ''}
+    <div class="msg msg--pandit"><h4 class="h--main">Why</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">Period</h4>${a.started ? `<p><b>Started:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p><b>Changes:</b> ${esc(a.timing)}</p>` : ''}` : ''}${a.next ? `<h4 class="h--main">Next phase</h4><p>${esc(a.next)}</p>` : ''}${a.remedy ? `<h4 class="h--main">Remedy</h4><p>${esc(a.remedy)}</p>` : ''}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
