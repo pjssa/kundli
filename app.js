@@ -1,7 +1,7 @@
 /**
  * app.js (kundli) — the public Kundli page. Anyone signs in with their own
  * Google account, keeps their own and their family's kundlis, and chats with
- * the pandit. Self-contained (own fetch wrapper, own GIS init), same reasoning
+ * CosmicMath. Self-contained (own fetch wrapper, own GIS init), same reasoning
  * as frontend/form/. The server scopes every call to the verified email, so
  * nothing here can reach another person's data.
  */
@@ -78,7 +78,7 @@ async function call(action, payload = {}) {
 function showSignIn(message = '') {
   app.innerHTML = `<div class="wrap"><div class="panel"><div class="signin">
     <h1>Cosmic Math</h1>
-    <p class="muted">Enter your birth details and ask the pandit anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
+    <p class="muted">Enter your birth details and ask CosmicMath anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
     <div id="gbtn"></div>
   </div></div></div>`;
@@ -154,7 +154,7 @@ async function renderList() {
   const who = { email: me.email || prof.email || '', name: me.name || prof.name || '', picture: prof.email && me.email && prof.email !== me.email ? '' : (prof.picture || '') };
   app.innerHTML = `<div class="wrap">
     <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>
-    <p class="muted">Add yourself and your family members, then ask the pandit about any of them.</p>
+    <p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
     ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
@@ -191,7 +191,7 @@ async function renderDetail(kundliId) {
     <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
 
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;">Ask the pandit</h2><div class="tools"><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full screen</button></div></div>
+      <div class="top"><h2 style="margin:0;">Ask CosmicMath</h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
@@ -208,6 +208,7 @@ async function renderDetail(kundliId) {
     ${footerHtml()}
   </div>`;
   wireFooter();
+  document.getElementById('langTop').addEventListener('click', openLanguage);
 
   document.getElementById('back').addEventListener('click', renderList);
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
@@ -227,7 +228,7 @@ async function renderDetail(kundliId) {
     clearBtn.hidden = !has;
     if (!has && !thread.querySelector('.hint')) thread.innerHTML = hintHtml();
   };
-  // Answers are written by the pandit in the chosen language, so only the headings of a non-English answer need fetching (cached server-side per language).
+  // Answers are written by CosmicMath in the chosen language, so only the headings of a non-English answer need fetching (cached server-side per language).
   const needLabels = () => [...new Set(hist.map((x) => x.lang).filter((c) => c && c !== 'en' && !labelCache.has(c)))];
   const fetchLabels = async (codes) => {
     const status = document.getElementById('langStatus');
@@ -258,7 +259,7 @@ async function renderDetail(kundliId) {
   const setFull = (on) => {
     chat.classList.toggle('full', on);
     document.body.classList.toggle('locked', on);
-    fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
+    fullBtn.innerHTML = on ? 'Exit<span class="lg"> full screen</span>' : 'Full<span class="lg"> screen</span>';
     fullBtn.setAttribute('aria-pressed', String(on));
     toBottom();
   };
@@ -308,7 +309,7 @@ async function renderDetail(kundliId) {
     toBottom();
     const run = async (ids) => {
       box.querySelectorAll('button, input').forEach((n) => { n.disabled = true; });
-      box.innerHTML = '<p class="muted">The pandit is studying the charts&hellip;</p>';
+      box.innerHTML = '<p class="muted">CosmicMath is studying the charts&hellip;</p>';
       try {
         const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined }));
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
@@ -338,7 +339,7 @@ async function renderDetail(kundliId) {
     if (!question || sendBtn.disabled) return;
     sendBtn.disabled = true;
     thread.querySelector('.hint')?.remove();
-    thread.insertAdjacentHTML('beforeend', `<div class="msg msg--me pending"><p>${esc(question)}</p></div><div class="msg msg--pandit typing"><p class="muted">The pandit is studying the chart&hellip;</p></div>`);
+    thread.insertAdjacentHTML('beforeend', `<div class="msg msg--me pending"><p>${esc(question)}</p></div><div class="msg msg--pandit typing"><p class="muted">CosmicMath is studying the chart&hellip;</p></div>`);
     qBox.value = ''; grow(); toBottom();
     const dropPending = () => thread.querySelectorAll('.pending, .typing').forEach((n) => n.remove());
     try {
@@ -379,7 +380,7 @@ async function loadPeople() {
 }
 
 // ---------------------------------------------------------------- reading language
-// '' means automatic: the pandit answers in the language the question is written in.
+// '' means automatic: CosmicMath answers in the language the question is written in.
 const LANGS = [['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو'], ['en', 'English']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
@@ -391,7 +392,7 @@ const langName = (c) => (LANGS.find((l) => l[0] === c) || [c, c])[1];
 const labelCache = new Map();
 let onLangChange = null;
 
-const hintHtml = () => '<p class="hint muted">Ask your first question below. You can follow up on any answer, the pandit remembers this conversation.</p>';
+const hintHtml = () => '<p class="hint muted">Ask your first question below. You can follow up on any answer, CosmicMath remembers this conversation.</p>';
 
 // Best timings sit in their own section, never merged into Period, and carry a caution so they are not read as a promise.
 function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
@@ -442,7 +443,7 @@ function wireFooter() {
 }
 function overlayPanel(html) {
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:10;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
   overlay.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin-top:24px;">${html}</div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
@@ -476,7 +477,7 @@ function openFeedback() {
 }
 function openLanguage() {
   const o = overlayPanel(`<h2>Answer in your language</h2>
-    <p class="muted">The pandit answers your new questions in the language you pick. With no choice, it answers in the language you write the question in.</p>
+    <p class="muted">CosmicMath answers your new questions in the language you pick. With no choice, it answers in the language you write the question in.</p>
     <div class="actions" style="flex-wrap:wrap;">
       <button type="button" class="btn-secondary btn-small" data-lang="">${lang ? '' : '&#10003; '}Same as my question</button>
       ${LANGS.map(([c, n]) => `<button type="button" class="btn-secondary btn-small" data-lang="${c}">${lang === c ? '&#10003; ' : ''}${esc(n)}</button>`).join('')}
@@ -495,7 +496,7 @@ function openLanguage() {
 function openModal(k, done) {
   const isEdit = !!k;
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:10;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
   overlay.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin-top:24px;">
     <h2>${isEdit ? 'Edit' : 'Add a'} person</h2>
     <form id="f">
@@ -535,3 +536,30 @@ function openModal(k, done) {
 }
 
 if (getSession() || currentToken()) renderList(); else showSignIn();
+
+// ---------------------------------------------------------------- add to home screen
+// Phones are asked on every visit until the page is running as an installed app. Chrome and Edge offer a real
+// install button; iPhone Safari and other browsers have no such API, so they get the manual steps instead.
+let installEvent = null;
+function installBanner() {
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (standalone || !window.matchMedia('(max-width: 600px)').matches) return;
+  try { if (sessionStorage.getItem('kundliInstallDismissed')) return; } catch { /* ask again */ }
+  let bar = document.getElementById('installBar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'installBar'; bar.className = 'installbar'; app.before(bar); }
+  const ua = navigator.userAgent || '';
+  const ios = /iPhone|iPad|iPod/.test(ua);
+  const how = installEvent ? '' : ios
+    ? '<span class="muted">Tap the Share button, then <b>Add to Home Screen</b>.</span>'
+    : '<span class="muted">Open the browser menu, then choose <b>Add to Home screen</b>.</span>';
+  bar.innerHTML = `<div class="installbar-text"><b>Add Cosmic Math to your home screen</b>${how ? `<br>${how}` : ''}</div>${installEvent ? '<button type="button" class="btn-primary btn-small" id="installGo">Add</button>' : ''}<button type="button" class="installbar-x" id="installX" aria-label="Not now">&times;</button>`;
+  document.getElementById('installX').addEventListener('click', () => { try { sessionStorage.setItem('kundliInstallDismissed', '1'); } catch { /* ignore */ } bar.remove(); });
+  document.getElementById('installGo')?.addEventListener('click', async () => {
+    const ev = installEvent; installEvent = null; bar.remove();
+    try { await ev.prompt(); } catch { /* the browser declined to show it */ }
+  });
+}
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; installBanner(); });
+window.addEventListener('appinstalled', () => document.getElementById('installBar')?.remove());
+installBanner();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* installing still works from the browser menu */ });

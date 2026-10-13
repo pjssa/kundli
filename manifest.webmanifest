@@ -1,7 +1,7 @@
 {
   "name": "Cosmic Math",
   "short_name": "Cosmic Math",
-  "description": "Ask the pandit about your kundli.",
+  "description": "Ask CosmicMath about your kundli.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -107,3 +107,18 @@ body.locked { overflow: hidden; }
 
 /* The Started and Changes lines under Current period are reference detail: small and grey. */
 .msg p.pline { font-size: 13px; color: var(--ink-muted); }
+
+.installbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border-strong); font-size: 14px; line-height: 1.35; }
+.installbar-text { flex: 1; min-width: 0; }
+.installbar-x { background: none; border: 0; font-size: 24px; line-height: 1; padding: 4px 8px; color: var(--ink-muted); cursor: pointer; }
+
+@media (max-width: 600px) {
+  /* Title and the three buttons stay on one row in the chat header, also in full screen. */
+  .chat .top { flex-wrap: nowrap; gap: 6px; }
+  .chat .top h2 { font-size: 15px; white-space: nowrap; }
+  .chat .tools { flex-wrap: nowrap; gap: 4px; }
+  .chat .tools .btn-small { padding: 6px 8px; font-size: 12px; white-space: nowrap; }
+}
+@media (max-width: 400px) { .chat.full .tools .lg { display: none; } }
+/* The footer already has the language button; the header one is for full screen, where the footer is out of reach. */
+.chat:not(.full) #langTop { display: none; }
