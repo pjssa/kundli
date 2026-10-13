@@ -324,7 +324,7 @@ async function loadPeople() {
 // '' means automatic: the pandit answers in the language the question is written in.
 const LANGS = [['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو'], ['en', 'English']];
 const L_EN = {
-  why: 'Why', period: 'Period', started: 'Started', changes: 'Changes', bestTimings: 'Best timings', highestChances: 'Highest chances', goodChances: 'Good chances',
+  why: 'Why', period: 'Period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'Highest chances', goodChances: 'Good chances',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', nextPhase: 'Next phase', remedy: 'Remedy',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || ''; } catch { return ''; } })();
