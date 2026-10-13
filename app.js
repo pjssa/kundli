@@ -204,28 +204,10 @@ async function renderDetail(kundliId) {
       </form>
     </div>
 
-    <div class="panel"><details id="chartDet" class="chartdet"><summary>Birth chart</summary><div class="chartbar"><button type="button" class="btn-secondary" id="chartFull" aria-pressed="false">Full screen</button></div>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
+    <div class="panel"><details><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
     ${footerHtml()}
   </div>`;
   wireFooter();
-
-  // Opening the chart details takes the whole screen; Exit full screen (or Esc) returns to the normal view until it is opened again.
-  const chartDet = document.getElementById('chartDet');
-  const chartFullBtn = document.getElementById('chartFull');
-  const setChartFull = (on) => {
-    chartDet.classList.toggle('full', on);
-    document.body.classList.toggle('locked', on);
-    chartFullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
-    chartFullBtn.setAttribute('aria-pressed', String(on));
-    if (on) chartDet.scrollTop = 0;
-  };
-  chartDet.addEventListener('toggle', () => setChartFull(chartDet.open));
-  chartFullBtn.addEventListener('click', () => setChartFull(!chartDet.classList.contains('full')));
-  const onChartEsc = (e) => {
-    if (!chartDet.isConnected) { document.removeEventListener('keydown', onChartEsc); document.body.classList.remove('locked'); return; }
-    if (e.key === 'Escape' && chartDet.classList.contains('full')) setChartFull(false);
-  };
-  document.addEventListener('keydown', onChartEsc);
 
   document.getElementById('back').addEventListener('click', renderList);
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
@@ -280,11 +262,17 @@ async function renderDetail(kundliId) {
     fullBtn.setAttribute('aria-pressed', String(on));
     toBottom();
   };
-  fullBtn.addEventListener('click', () => setFull(!chat.classList.contains('full')));
+  // Opening a person starts in full screen; leaving it is remembered on this device until the person goes full screen again.
+  const FULL_KEY = 'ssa_kundli_chatfull';
+  const choose = (on) => { setFull(on); try { localStorage.setItem(FULL_KEY, on ? '1' : '0'); } catch { /* ignore */ } };
+  fullBtn.addEventListener('click', () => choose(!chat.classList.contains('full')));
   const onEsc = (e) => {
     if (!chat.isConnected) { document.removeEventListener('keydown', onEsc); document.body.classList.remove('locked'); return; }
-    if (e.key === 'Escape' && chat.classList.contains('full')) setFull(false);
+    if (e.key === 'Escape' && chat.classList.contains('full')) choose(false);
   };
+  let startFull = true;
+  try { startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
+  if (startFull) setFull(true);
   document.addEventListener('keydown', onEsc);
   thread.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('[data-del]');
