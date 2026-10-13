@@ -101,3 +101,6 @@ body.locked { overflow: hidden; }
   .wrap > p.muted { color: #3a444e; }
   body { background: #c6c8ca url('icons/page-bg.png') center / contain no-repeat fixed; }
 }
+
+/* The Started and Changes lines under Current period are reference detail: small and grey. */
+.msg p.pline { font-size: 13px; color: var(--ink-muted); }
