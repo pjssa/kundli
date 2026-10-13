@@ -89,3 +89,15 @@ body.locked { overflow: hidden; }
 .signout { display: inline-flex; align-items: center; gap: 8px; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex: none; }
 .avatar--initial { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
+
+/* Desktop: use the whole screen instead of a narrow centred column. Phones and tablets keep the compact layout above. */
+@media (min-width: 1000px) {
+  .wrap { max-width: none; padding: 24px clamp(32px, 4vw, 72px) 56px; }
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .thread { max-height: none; height: clamp(420px, calc(100vh - 380px), 900px); }
+  .msg { max-width: min(78%, 900px); }
+  .chart { max-width: 520px; }
+  /* The same artwork as the chat, lighter, behind the whole page; it stays put while the page scrolls. */
+  .wrap > p.muted { color: #3a444e; }
+  body { background: #c6c8ca url('icons/page-bg.png') center / contain no-repeat fixed; }
+}
