@@ -290,7 +290,8 @@ async function renderDetail(kundliId) {
   let landOnAnswer = false;
   const toBottom = () => {
     const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
-    if (latest) { thread.scrollTop += latest.getBoundingClientRect().top - thread.getBoundingClientRect().top; return; }
+    // scrollIntoView moves the chat box and the page together; on a phone the page itself had been left scrolled down at the composer.
+    if (latest) { latest.scrollIntoView({ block: 'start' }); return; }
     thread.scrollTop = thread.scrollHeight;
   };
   const syncBar = () => {
@@ -513,7 +514,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit">${a.clarify ? '' : `<h4 class="h--main">${esc(L.why)}</h4>`}<p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
+    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
