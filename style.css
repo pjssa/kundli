@@ -145,3 +145,9 @@ body.locked { overflow: hidden; }
 .signin { position: relative; isolation: isolate; min-height: 420px; justify-content: center; }
 .signin::before { content: ''; position: absolute; inset: 0; z-index: -1; background: url('icons/icon-512.png') center / contain no-repeat; opacity: 0.22; border-radius: var(--radius-lg); }
 .signin .tribute { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 15px; line-height: 1.6; max-width: 34ch; margin-top: 6px; }
+
+.fu { margin: 12px 0 8px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-strong); }
+.fu p { margin: 0 0 8px; font-weight: 500; }
+.fu-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fu-chip { border: 1px solid var(--border-strong); background: transparent; color: inherit; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; }
+.fu-chip:hover { border-color: var(--accent); }

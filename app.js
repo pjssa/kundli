@@ -291,7 +291,7 @@ async function renderDetail(kundliId) {
   const syncBar = () => {
     const has = !!thread.querySelector('.ans');
     clearBtn.hidden = !has;
-    if (!has && !thread.querySelector('.hint')) thread.innerHTML = hintHtml();
+    if (!has && !thread.querySelector('.hint')) { thread.innerHTML = hintHtml(); renderFollowUps(); }
   };
   // Answers are written by CosmicMath in the chosen language, so only the headings of a non-English answer need fetching (cached server-side per language).
   const needLabels = () => [...new Set(hist.map((x) => x.lang).filter((c) => c && c !== 'en' && !labelCache.has(c)))];
@@ -314,6 +314,7 @@ async function renderDetail(kundliId) {
     thread.innerHTML = hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml();
     clearBtn.hidden = !hist.length;
     toBottom();
+    renderFollowUps();
   };
   // Picking a language only affects new questions; fetch its headings now so the next answer shows at once.
   onLangChange = () => { if (lang && lang !== 'en' && !labelCache.has(lang)) fetchLabels([lang]); };
@@ -354,6 +355,31 @@ async function renderDetail(kundliId) {
   });
   const grow = () => { qBox.style.height = 'auto'; qBox.style.height = `${Math.min(qBox.scrollHeight, 140)}px`; };
   qBox.addEventListener('input', grow);
+
+  // Keeps the chat alive: after every answer (and on an empty chat) a teaser and three tappable next questions sit at the bottom of the thread.
+  let starter = null;
+  const fuHtml = (curiosity, sugg) => `<div class="fu"><p>${esc(curiosity)}</p><div class="fu-chips">${sugg.map((t) => `<button type="button" class="fu-chip">${esc(t)}</button>`).join('')}</div></div>`;
+  const renderFollowUps = async () => {
+    thread.querySelectorAll('.fu').forEach((n) => n.remove());
+    const a = hist[0] && hist[0].answer;
+    let data = a && a.curiosity && Array.isArray(a.suggestions) && a.suggestions.length ? a : null;
+    if (!hist.length) {
+      if (!starter) { try { starter = await call('kundliPublic_starter', { kundliId: k.kundliId, language: lang || undefined }); } catch { return; } }
+      data = starter;
+    }
+    if (!data || (!a && hist.length)) return;
+    thread.querySelectorAll('.fu').forEach((n) => n.remove());
+    thread.insertAdjacentHTML('beforeend', fuHtml(data.curiosity, data.suggestions));
+    toBottom();
+  };
+  thread.addEventListener('click', (e) => {
+    const chip = e.target.closest('.fu-chip');
+    if (!chip) return;
+    qBox.value = chip.textContent; grow();
+    document.getElementById('askForm').requestSubmit();
+  });
+  document.getElementById('askForm').addEventListener('submit', () => thread.querySelectorAll('.fu').forEach((n) => n.remove()));
+  renderFollowUps();
 
   // For people who do not know what to ask an astrologer: tapping the empty box offers plain-language questions; typing still works as before.
   const suggEl = document.getElementById('Sugg');
@@ -496,7 +522,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><h4 class="h--main">${esc(L.why)}</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
+    <div class="msg msg--pandit">${a.clarify ? '' : `<h4 class="h--main">${esc(L.why)}</h4>`}<p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
