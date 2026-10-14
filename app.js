@@ -204,10 +204,37 @@ async function renderDetail(kundliId) {
       </form>
     </div>
 
+    <div class="panel" id="suitPanel">
+      <h2 style="margin:0 0 6px;">Name, number &amp; company check</h2>
+      <p class="muted">See whether a name, mobile number or company name suits ${esc(k.name)}, by numerology and the birth chart, with spelling corrections.</p>
+      <form id="suitForm" class="suit-form">
+        <select id="suitKind" aria-label="What to check"><option value="name">Name</option><option value="mobile">Mobile number</option><option value="company">Company name</option></select>
+        <input id="suitVal" type="text" maxlength="80" placeholder="${SUIT_HINT.name}" aria-label="Name, number or company to check" />
+        <button class="btn-primary" id="suitGo" type="submit">Check</button>
+      </form>
+      <p class="error" id="suitErr" hidden></p>
+      <div class="suit-out msg msg--pandit" id="suitOut" hidden></div>
+    </div>
+
     <div class="panel"><details><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
     ${footerHtml()}
   </div>`;
   wireFooter();
+  const suitKind = document.getElementById('suitKind');
+  suitKind.addEventListener('change', () => { document.getElementById('suitVal').placeholder = SUIT_HINT[suitKind.value]; });
+  document.getElementById('suitForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const val = document.getElementById('suitVal').value.trim();
+    const err = document.getElementById('suitErr'), out = document.getElementById('suitOut'), go = document.getElementById('suitGo');
+    err.hidden = true;
+    if (!val) { err.textContent = 'Please type what to check.'; err.hidden = false; return; }
+    go.disabled = true; go.textContent = 'Checking\u2026';
+    try {
+      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind: suitKind.value, value: val }));
+      if (r) { out.innerHTML = suitabilityHtml(r); out.hidden = false; }
+    } catch (ex) { err.textContent = ex.message; err.hidden = false; out.hidden = true; }
+    go.disabled = false; go.textContent = 'Check';
+  });
   document.getElementById('langTop').addEventListener('click', openLanguage);
 
   document.getElementById('back').addEventListener('click', renderList);
@@ -433,6 +460,33 @@ function planetTableHtml(chart) {
 }
 
 // ---------------------------------------------------------------- add / edit
+
+// ---------------------------------------------------------------- name, mobile number and company check
+const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
+const score100 = (n) => `${n}/100`;
+function suitabilityHtml(r) {
+  const c = r.current;
+  const lines = [];
+  if (r.kind === 'mobile') {
+    lines.push(`<p><b>Mobile number:</b> ${esc(r.input)}</p>`);
+    lines.push(`<p>The digits add up to ${c.total}, which reduces to ${c.number} (${esc(c.planet)}). Numerology fit ${score100(c.numerology)}, birth chart fit ${score100(c.vedic)}.</p>`);
+    lines.push(`<h4 class="h--main">Result</h4><p><b>${esc(c.verdict)}</b> &middot; ${score100(c.score)}</p>`);
+    lines.push(`<h4 class="h--main">Totals that would suit you best</h4><p>${r.bestTotals.map((b) => `${b.number} (${esc(b.planet)}) ${score100(b.score)}`).join(' &middot; ')}</p><p>When choosing a new number, pick one whose digits add up to one of these.</p>`);
+  } else {
+    lines.push(`<p><b>${r.kind === 'company' ? 'Company name' : 'Name'}:</b> ${esc(r.input)}</p>`);
+    for (const s of c.systems) lines.push(`<p>${esc(s.label)}: letters add up to ${s.total}, reduces to ${s.number} (${esc(s.planet)}). Numerology fit ${score100(s.numerology)}, birth chart fit ${score100(s.vedic)}. Score ${score100(s.score)}.</p>`);
+    lines.push(`<h4 class="h--main">Result (average of both)</h4><p><b>${esc(c.verdict)}</b> &middot; ${score100(c.score)}</p>`);
+    if (c.start) lines.push(c.start.ok
+      ? `<p>The first sound suits the Moon star (${esc(c.start.nakshatra)}).</p>`
+      : `<p>The first sound does not match the Moon star (${esc(c.start.nakshatra)}). Names starting with ${esc(c.start.starts.join(', '))} suit it best.</p>`);
+    lines.push(`<h4 class="h--main">Spelling corrections</h4>`);
+    lines.push(r.suggestions.length
+      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b> &middot; ${score100(x.score)} (${esc(x.verdict)})<br>${esc(x.change)}. ${x.systems.map((s) => `${esc(s.label)} ${s.number} (${esc(s.planet)})`).join(', ')}.</p>`).join('')
+      : `<p>No spelling change keeps the pronunciation and improves it. For a different name, aim for letters that add up to ${r.bestNumbers.map((b) => `${b.number} (${esc(b.planet)})`).join(', ')}.</p>`);
+  }
+  lines.push(`<p class="bt-note disc">This is a prediction, not a guarantee.</p>`);
+  return lines.join('');
+}
 
 // ---------------------------------------------------------------- footer: feedback and language
 function footerHtml() {

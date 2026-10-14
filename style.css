@@ -128,3 +128,10 @@ body.locked { overflow: hidden; }
 .chat:not(.full) #langTop { display: none; }
 
 .msg .disc { margin-top: 18px; }
+
+.suit-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.suit-form select { flex: 0 0 auto; }
+.suit-form input { flex: 1 1 180px; min-width: 0; }
+.suit-out { max-width: none; margin-top: 10px; }
+.suit-out h4 { margin-top: 18px; }
+.suit-out p + p { margin-top: 8px; }
