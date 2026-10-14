@@ -75,29 +75,64 @@ async function call(action, payload = {}) {
   return parsed.data;
 }
 
+// What happens once Google has handed over a verified credential, whichever way it arrived (button pop-up or full-page return).
+async function completeSignIn(credential) {
+  // A fresh Google sign-in replaces any remembered session on this device, or the old account's session would answer the next call.
+  clearSession();
+  setToken(credential);
+  const gp = jwtPayload(credential);
+  if (gp) setProfile({ name: gp.name || '', email: String(gp.email || '').toLowerCase(), picture: gp.picture || '' });
+  // Trade the Google token for a long-lived device session; if that fails this visit simply keeps using Google's.
+  // The first call after a quiet spell can fail while the server wakes up; call() drops the token on that failure, so it is put back for a second try instead of bouncing a good sign-in to this screen.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { const out = await call('kundliPublic_remember', { deviceLabel: deviceLabelGuess() }); setSession(out.sessionToken, out.expiresAt); break; } catch { setToken(credential); }
+  }
+  renderList();
+}
+
+// Full-page Google sign-in. The pop-up button cannot hand its result back inside an iPhone Home Screen app (the person is left on a blank
+// page), so there Google is opened as an ordinary page and returns to this address with the signed ID token in the URL fragment.
+// https://cosmicmath.in/ must be listed as an authorised redirect URI for the Google client.
+const OAUTH_KEY = 'ssa_kundli_oauth';
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+function randomString() { return Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, '0')).join(''); }
+function startFullPageSignIn() {
+  const state = randomString(), nonce = randomString();
+  try { localStorage.setItem(OAUTH_KEY, JSON.stringify({ state, nonce, at: Date.now() })); } catch { /* the return check then refuses, and the person sees the sign-in screen again */ }
+  const q = new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: `${location.origin}/`, response_type: 'id_token', scope: 'openid email profile', nonce, state, prompt: 'select_account' });
+  location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${q}`);
+}
+// Returns true when this page load was Google handing a sign-in back.
+function handleFullPageReturn() {
+  if (!location.hash.includes('id_token=') && !location.hash.includes('error=')) return false;
+  const params = new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null, '', location.pathname + location.search);
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(OAUTH_KEY) || 'null'); localStorage.removeItem(OAUTH_KEY); } catch { /* treated as no saved check */ }
+  const token = params.get('id_token');
+  const p = token && jwtPayload(token);
+  const fresh = saved && Date.now() - saved.at < 15 * 60 * 1000;
+  if (!token || !p || !fresh || params.get('state') !== saved.state || p.nonce !== saved.nonce || p.exp * 1000 < Date.now()) {
+    showSignIn(params.get('error') ? 'Google sign-in was cancelled. Please try again.' : 'That sign-in could not be checked. Please try again.');
+    return true;
+  }
+  completeSignIn(token);
+  return true;
+}
+
 function showSignIn(message = '') {
   app.innerHTML = `<div class="wrap"><div class="panel"><div class="signin">
     <h1>Cosmic Math</h1>
     <p class="muted">Enter your birth details and ask CosmicMath anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
-    <div id="gbtn"></div>
+    ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Continue with Google</button>' : '<div id="gbtn"></div><p class="muted" style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
   </div></div></div>`;
+  document.getElementById('gfull').addEventListener('click', startFullPageSignIn);
+  if (isStandalone()) return;
   const init = () => {
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
-      callback: async (r) => {
-        // A fresh Google sign-in replaces any remembered session on this device, or the old account's session would answer the next call.
-        clearSession();
-        setToken(r.credential);
-        const gp = jwtPayload(r.credential);
-        if (gp) setProfile({ name: gp.name || '', email: String(gp.email || '').toLowerCase(), picture: gp.picture || '' });
-        // Trade the Google token for a long-lived device session; if that fails this visit simply keeps using Google's.
-        // The first call after a quiet spell can fail while the server wakes up; call() drops the token on that failure, so it is put back for a second try instead of bouncing a good sign-in to this screen.
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try { const out = await call('kundliPublic_remember', { deviceLabel: deviceLabelGuess() }); setSession(out.sessionToken, out.expiresAt); break; } catch { setToken(r.credential); }
-        }
-        renderList();
-      },
+      callback: (r) => completeSignIn(r.credential),
     });
     window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with' });
   };
@@ -582,7 +617,7 @@ function openModal(k, done) {
   });
 }
 
-if (getSession() || currentToken()) renderList(); else showSignIn();
+if (handleFullPageReturn()) { /* signing in */ } else if (getSession() || currentToken()) renderList(); else showSignIn();
 
 // ---------------------------------------------------------------- add to home screen
 // Phones get a popup on every visit until the page runs as an installed app. Chrome and Edge install from the popup's own
