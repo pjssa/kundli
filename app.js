@@ -232,7 +232,6 @@ async function renderDetail(kundliId) {
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
-      <div class="sugg" id="Sugg" hidden></div>
       <form class="composer" id="askForm">
         <textarea id="q" rows="1" placeholder="Ask anything, e.g. Will I get a promotion this year?"></textarea>
         <div class="send-col">
@@ -357,6 +356,8 @@ async function renderDetail(kundliId) {
   qBox.addEventListener('input', grow);
 
   // Keeps the chat alive: after every answer (and on an empty chat) a teaser and three tappable next questions sit at the bottom of the thread.
+  // Shown in the chat when the personal opening cannot be prepared, so a new person still has questions to tap.
+  const FALLBACK = { curiosity: 'Not sure what to ask? Tap any question below, or type your own.', suggestions: ["Will I get a promotion this year?", "How will my business perform this year?", "How is my health expected to be?", "How will my married life be?", "When is a good time to change my job?", "Will I have financial gains this year?", "When will I get married?", "Is this a good time to buy a house or property?"].slice(0, 4) };
   let starter = null;
   const fuHtml = (curiosity, sugg) => `<div class="fu"><p>${esc(curiosity)}</p><div class="fu-chips">${sugg.map((t) => `<button type="button" class="fu-chip">${esc(t)}</button>`).join('')}</div></div>`;
   const renderFollowUps = async () => {
@@ -364,7 +365,7 @@ async function renderDetail(kundliId) {
     const a = hist[0] && hist[0].answer;
     let data = a && a.curiosity && Array.isArray(a.suggestions) && a.suggestions.length ? a : null;
     if (!hist.length) {
-      if (!starter) { try { starter = await call('kundliPublic_starter', { kundliId: k.kundliId, language: lang || undefined }); } catch { return; } }
+      if (!starter) { try { starter = await call('kundliPublic_starter', { kundliId: k.kundliId, language: lang || undefined }); } catch { starter = FALLBACK; } }
       data = starter;
     }
     if (!data || (!a && hist.length)) return;
@@ -381,22 +382,6 @@ async function renderDetail(kundliId) {
   document.getElementById('askForm').addEventListener('submit', () => thread.querySelectorAll('.fu').forEach((n) => n.remove()));
   renderFollowUps();
 
-  // For people who do not know what to ask an astrologer: tapping the empty box offers plain-language questions; typing still works as before.
-  const suggEl = document.getElementById('Sugg');
-  const SUGGESTIONS = ["Will I get a promotion this year?", "How will my business perform this year?", "How is my health expected to be?", "How will my married life be?", "When is a good time to change my job?", "Will I have financial gains this year?", "When will I get married?", "Is this a good time to buy a house or property?"];
-  suggEl.innerHTML = SUGGESTIONS.map((t) => `<button type="button" class="sugg-chip">${t}</button>`).join('');
-  const syncSugg = () => { suggEl.hidden = !(document.activeElement === qBox && !qBox.value.trim()); };
-  qBox.addEventListener('focus', syncSugg);
-  qBox.addEventListener('input', syncSugg);
-  qBox.addEventListener('blur', () => { suggEl.hidden = true; });
-  // mousedown must not steal focus from the box, or the blur would hide the chips before the click lands.
-  suggEl.addEventListener('mousedown', (e) => e.preventDefault());
-  suggEl.addEventListener('click', (e) => {
-    const chip = e.target.closest('.sugg-chip');
-    if (!chip) return;
-    qBox.value = chip.textContent; grow(); suggEl.hidden = true;
-    document.getElementById('askForm').requestSubmit();
-  });
   qBox.addEventListener('keydown', (e) => {
     // Touch keyboards keep Enter as a new line; the Send button sends.
     if (e.key === 'Enter' && !e.shiftKey && !window.matchMedia('(pointer: coarse)').matches) { e.preventDefault(); document.getElementById('askForm').requestSubmit(); }
