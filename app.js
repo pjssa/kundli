@@ -463,15 +463,17 @@ function planetTableHtml(chart) {
 
 // ---------------------------------------------------------------- name, mobile number and company check
 const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
+const SUIT_AREAS = [['health', 'Health'], ['wealth', 'Wealth'], ['relations', 'Relations']];
+const suitLine = (areas) => SUIT_AREAS.map(([k, label]) => `${label}: <b>${esc(areas[k])}</b>`).join(' &middot; ');
 function suitabilityHtml(r) {
   const c = r.current;
   const what = r.kind === 'mobile' ? 'Mobile number' : r.kind === 'company' ? 'Company name' : 'Name';
-  const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4><p><b>${esc(c.verdict)}</b></p>`];
-  // Corrections only where they help: a name or company that is not already favourable.
-  if (r.kind !== 'mobile' && c.verdict !== 'Favourable') {
+  const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4>`, ...SUIT_AREAS.map(([k, label]) => `<p>${label}: <b>${esc(c.areas[k])}</b></p>`)];
+  // Corrections only where they help: a name or company that is not already favourable in every area.
+  if (r.kind !== 'mobile' && SUIT_AREAS.some(([k]) => c.areas[k] !== 'Favourable')) {
     lines.push(`<h4 class="h--main">Spelling corrections</h4>`);
     lines.push(r.suggestions.length
-      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b> &middot; ${esc(x.verdict)}</p>`).join('')
+      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b><br>${suitLine(x.areas)}</p>`).join('')
       : `<p>No spelling change that keeps the pronunciation improves it.</p>`);
   }
   lines.push(`<p class="bt-note disc">This is a prediction, not a guarantee.</p>`);
