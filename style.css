@@ -149,5 +149,5 @@ body.locked { overflow: hidden; }
 .fu { margin: 12px 0 8px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-strong); }
 .fu p { margin: 0 0 8px; font-weight: 500; }
 .fu-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.fu-chip { border: 1px solid var(--border-strong); background: transparent; color: inherit; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; }
-.fu-chip:hover { border-color: var(--accent); }
+.fu-chip { border: 1px solid var(--border-strong); background: #fff; color: #1f2937; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; }
+.fu-chip:hover { border-color: var(--accent); background: #f3f4f6; }
