@@ -126,6 +126,8 @@ function showSignIn(message = '') {
     <p class="muted">Enter your birth details and ask CosmicMath anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
     ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Continue with Google</button>' : '<div id="gbtn"></div><p class="muted" style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
+    <p class="muted">This is a prediction, not a guarantee.</p>
+    <p class="tribute">This application is a humble tribute to our great Pandit Shree Viresh Jain, whose wisdom lights the way for all who seek the stars.</p>
   </div></div></div>`;
   document.getElementById('gfull').addEventListener('click', startFullPageSignIn);
   if (isStandalone()) return;
@@ -230,6 +232,7 @@ async function renderDetail(kundliId) {
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
+      <div class="sugg" id="Sugg" hidden></div>
       <form class="composer" id="askForm">
         <textarea id="q" rows="1" placeholder="Ask anything, e.g. Will I get a promotion this year?"></textarea>
         <div class="send-col">
@@ -351,6 +354,23 @@ async function renderDetail(kundliId) {
   });
   const grow = () => { qBox.style.height = 'auto'; qBox.style.height = `${Math.min(qBox.scrollHeight, 140)}px`; };
   qBox.addEventListener('input', grow);
+
+  // For people who do not know what to ask an astrologer: tapping the empty box offers plain-language questions; typing still works as before.
+  const suggEl = document.getElementById('Sugg');
+  const SUGGESTIONS = ["Will I get a promotion this year?", "How will my business perform this year?", "How is my health expected to be?", "How will my married life be?", "When is a good time to change my job?", "Will I have financial gains this year?", "When will I get married?", "Is this a good time to buy a house or property?"];
+  suggEl.innerHTML = SUGGESTIONS.map((t) => `<button type="button" class="sugg-chip">${t}</button>`).join('');
+  const syncSugg = () => { suggEl.hidden = !(document.activeElement === qBox && !qBox.value.trim()); };
+  qBox.addEventListener('focus', syncSugg);
+  qBox.addEventListener('input', syncSugg);
+  qBox.addEventListener('blur', () => { suggEl.hidden = true; });
+  // mousedown must not steal focus from the box, or the blur would hide the chips before the click lands.
+  suggEl.addEventListener('mousedown', (e) => e.preventDefault());
+  suggEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('.sugg-chip');
+    if (!chip) return;
+    qBox.value = chip.textContent; grow(); suggEl.hidden = true;
+    document.getElementById('askForm').requestSubmit();
+  });
   qBox.addEventListener('keydown', (e) => {
     // Touch keyboards keep Enter as a new line; the Send button sends.
     if (e.key === 'Enter' && !e.shiftKey && !window.matchMedia('(pointer: coarse)').matches) { e.preventDefault(); document.getElementById('askForm').requestSubmit(); }
@@ -476,7 +496,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><h4 class="h--main">${esc(L.why)}</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}<p class="bt-note disc">${esc(L.disclaimer || L_EN.disclaimer)}</p>
+    <div class="msg msg--pandit"><h4 class="h--main">${esc(L.why)}</h4><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }

@@ -136,3 +136,12 @@ body.locked { overflow: hidden; }
 .suit-out h4 { margin-top: 18px; }
 .suit-out p + p { margin-top: 8px; }
 
+.sugg { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sugg-chip { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; opacity: .85; }
+.sugg-chip:hover { opacity: 1; }
+.sugg[hidden] { display: none; }
+
+/* Sign-in: the logo sits faded behind the content so the text and Google button stay readable in either theme. */
+.signin { position: relative; isolation: isolate; min-height: 420px; justify-content: center; }
+.signin::before { content: ''; position: absolute; inset: 0; z-index: -1; background: url('icons/icon-512.png') center / contain no-repeat; opacity: 0.22; border-radius: var(--radius-lg); }
+.signin .tribute { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 15px; line-height: 1.6; max-width: 34ch; margin-top: 6px; }
