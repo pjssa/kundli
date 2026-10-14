@@ -463,26 +463,16 @@ function planetTableHtml(chart) {
 
 // ---------------------------------------------------------------- name, mobile number and company check
 const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
-const score100 = (n) => `${n}/100`;
 function suitabilityHtml(r) {
   const c = r.current;
-  const lines = [];
-  if (r.kind === 'mobile') {
-    lines.push(`<p><b>Mobile number:</b> ${esc(r.input)}</p>`);
-    lines.push(`<p>The digits add up to ${c.total}, which reduces to ${c.number} (${esc(c.planet)}). Numerology fit ${score100(c.numerology)}, birth chart fit ${score100(c.vedic)}.</p>`);
-    lines.push(`<h4 class="h--main">Result</h4><p><b>${esc(c.verdict)}</b> &middot; ${score100(c.score)}</p>`);
-    lines.push(`<h4 class="h--main">Totals that would suit you best</h4><p>${r.bestTotals.map((b) => `${b.number} (${esc(b.planet)}) ${score100(b.score)}`).join(' &middot; ')}</p><p>When choosing a new number, pick one whose digits add up to one of these.</p>`);
-  } else {
-    lines.push(`<p><b>${r.kind === 'company' ? 'Company name' : 'Name'}:</b> ${esc(r.input)}</p>`);
-    for (const s of c.systems) lines.push(`<p>${esc(s.label)}: letters add up to ${s.total}, reduces to ${s.number} (${esc(s.planet)}). Numerology fit ${score100(s.numerology)}, birth chart fit ${score100(s.vedic)}. Score ${score100(s.score)}.</p>`);
-    lines.push(`<h4 class="h--main">Result (average of both)</h4><p><b>${esc(c.verdict)}</b> &middot; ${score100(c.score)}</p>`);
-    if (c.start) lines.push(c.start.ok
-      ? `<p>The first sound suits the Moon star (${esc(c.start.nakshatra)}).</p>`
-      : `<p>The first sound does not match the Moon star (${esc(c.start.nakshatra)}). Names starting with ${esc(c.start.starts.join(', '))} suit it best.</p>`);
+  const what = r.kind === 'mobile' ? 'Mobile number' : r.kind === 'company' ? 'Company name' : 'Name';
+  const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4><p><b>${esc(c.verdict)}</b></p>`];
+  // Corrections only where they help: a name or company that is not already favourable.
+  if (r.kind !== 'mobile' && c.verdict !== 'Favourable') {
     lines.push(`<h4 class="h--main">Spelling corrections</h4>`);
     lines.push(r.suggestions.length
-      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b> &middot; ${score100(x.score)} (${esc(x.verdict)})<br>${esc(x.change)}. ${x.systems.map((s) => `${esc(s.label)} ${s.number} (${esc(s.planet)})`).join(', ')}.</p>`).join('')
-      : `<p>No spelling change keeps the pronunciation and improves it. For a different name, aim for letters that add up to ${r.bestNumbers.map((b) => `${b.number} (${esc(b.planet)})`).join(', ')}.</p>`);
+      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b> &middot; ${esc(x.verdict)}</p>`).join('')
+      : `<p>No spelling change that keeps the pronunciation improves it.</p>`);
   }
   lines.push(`<p class="bt-note disc">This is a prediction, not a guarantee.</p>`);
   return lines.join('');
