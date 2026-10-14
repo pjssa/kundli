@@ -286,7 +286,13 @@ async function renderDetail(kundliId) {
   const clearBtn = document.getElementById('clear');
   const qBox = document.getElementById('q');
   const sendBtn = document.getElementById('send');
-  const toBottom = () => { thread.scrollTop = thread.scrollHeight; };
+  // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
+  let landOnAnswer = false;
+  const toBottom = () => {
+    const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
+    if (latest) { thread.scrollTop += latest.getBoundingClientRect().top - thread.getBoundingClientRect().top; return; }
+    thread.scrollTop = thread.scrollHeight;
+  };
   const syncBar = () => {
     const has = !!thread.querySelector('.ans');
     clearBtn.hidden = !has;
@@ -407,7 +413,7 @@ async function renderDetail(kundliId) {
         const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined }));
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
         if (!out) return;
-        hist.unshift(out.entry);
+        hist.unshift(out.entry); landOnAnswer = true;
         await refreshLanguage();
       } catch (err) {
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
@@ -433,7 +439,7 @@ async function renderDetail(kundliId) {
     sendBtn.disabled = true;
     thread.querySelector('.hint')?.remove();
     thread.insertAdjacentHTML('beforeend', `<div class="msg msg--me pending"><p>${esc(question)}</p></div><div class="msg msg--pandit typing"><p class="muted">CosmicMath is studying the chart&hellip;</p></div>`);
-    qBox.value = ''; grow(); toBottom();
+    qBox.value = ''; grow(); landOnAnswer = false; toBottom();
     const dropPending = () => thread.querySelectorAll('.pending, .typing').forEach((n) => n.remove());
     try {
       if (combineTick.checked || COMBINE_RE.test(question)) {
@@ -447,7 +453,7 @@ async function renderDetail(kundliId) {
       const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined }));
       dropPending();
       if (!out) return;
-      hist.unshift(out.entry);
+      hist.unshift(out.entry); landOnAnswer = true;
       await refreshLanguage();
     } catch (err) {
       dropPending();
