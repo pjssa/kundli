@@ -481,14 +481,14 @@ async function loadPeople() {
 }
 
 // ---------------------------------------------------------------- reading language
-// Answers come in Hinglish (simple Hindi in English letters) unless another language was picked on this device.
-const LANGS = [['hinglish', 'Hinglish'], ['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو'], ['en', 'English']];
+// Answers come in simple Indian English unless another language was picked on this device.
+const LANGS = [['en', 'English'], ['hinglish', 'Hinglish'], ['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', disclaimer: 'This is a prediction, not a guarantee.',
 };
-let lang = (() => { try { return localStorage.getItem('kundliLang') || 'hinglish'; } catch { return 'hinglish'; } })();
-const setLang = (c) => { lang = c || 'hinglish'; try { localStorage.setItem('kundliLang', lang); } catch { /* ignore */ } };
+let lang = (() => { try { return localStorage.getItem('kundliLang') || 'en'; } catch { return 'en'; } })();
+const setLang = (c) => { lang = c || 'en'; try { localStorage.setItem('kundliLang', lang); } catch { /* ignore */ } };
 const langName = (c) => (LANGS.find((l) => l[0] === c) || [c, c])[1];
 const labelCache = new Map();
 let onLangChange = null;
@@ -598,7 +598,7 @@ function openFeedback() {
 }
 function openLanguage() {
   const o = overlayPanel(`<h2>Answer in your language</h2>
-    <p class="muted">CosmicMath answers your new questions in the language you pick. It starts in Hinglish, simple Hindi in English letters.</p>
+    <p class="muted">CosmicMath answers your new questions in the language you pick. It starts in simple English.</p>
     <div class="actions" style="flex-wrap:wrap;">
       ${LANGS.map(([c, n]) => `<button type="button" class="btn-secondary btn-small" data-lang="${c}">${lang === c ? '&#10003; ' : ''}${esc(n)}</button>`).join('')}
     </div>
