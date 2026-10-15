@@ -383,8 +383,9 @@ async function renderDetail(kundliId) {
   thread.addEventListener('click', (e) => {
     const chip = e.target.closest('.fu-chip');
     if (!chip) return;
+    // The suggestion goes into the question box for the person to edit and send; it is not asked for them.
     qBox.value = chip.textContent; grow();
-    document.getElementById('askForm').requestSubmit();
+    qBox.focus(); qBox.setSelectionRange(qBox.value.length, qBox.value.length);
   });
   document.getElementById('askForm').addEventListener('submit', () => thread.querySelectorAll('.fu').forEach((n) => n.remove()));
   renderFollowUps();
