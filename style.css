@@ -180,7 +180,7 @@ body.locked { overflow: hidden; }
   .wrap:has(.signin) { max-width: none; padding: 0; min-height: 100vh; background: #0b0f1c; }
   .panel:has(.signin) { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
   .signin { min-height: 100vh; width: 50%; margin-left: 50%; box-sizing: border-box; padding: 48px 56px; align-items: flex-start; text-align: left; }
-  .signin::before { position: fixed; inset: 0 auto 0 0; width: 50%; aspect-ratio: auto; margin: 0; z-index: -1; }
+  .signin::before { position: fixed; top: 0; left: 0; width: 50%; height: 100vh; aspect-ratio: auto; margin: 0; z-index: -1; }
   .signin .tribute { max-width: 42ch; }
 }
 
