@@ -126,7 +126,7 @@ function showSignIn(message = '') {
     <p class="muted s-intro">This App is made as per Global Privacy Policies, Your Data is exclusively visible to you only.</p>
     <div class="s-act">
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
-    ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Sign In</button>' : '<div id="gbtn"></div><p class="muted" style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
+    ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Sign In</button>' : '<div id="gbtn"></div><p class="muted" id="gtrouble" hidden style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
     </div>
     <div class="s-rest">
     <p class="muted">This is a prediction, not a guarantee.</p>
@@ -142,8 +142,18 @@ function showSignIn(message = '') {
     });
     window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'small', shape: 'pill', text: 'signin' });
   };
-  if (window.google?.accounts?.id) init();
-  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); init(); } }, 100); }
+  // The full-page fallback only matters when Google's button cannot load or render (in-app browsers, blockers), so it stays hidden otherwise.
+  const showFallback = () => { const el = document.getElementById('gtrouble'); if (el) el.hidden = false; };
+  const checkRendered = () => setTimeout(() => { if (!document.querySelector('#gbtn iframe, #gbtn div[role="button"]')) showFallback(); }, 2500);
+  if (window.google?.accounts?.id) { init(); checkRendered(); }
+  else {
+    let waited = 0;
+    const t = setInterval(() => {
+      waited += 100;
+      if (window.google?.accounts?.id) { clearInterval(t); init(); checkRendered(); }
+      else if (waited >= 6000) { clearInterval(t); showFallback(); }
+    }, 100);
+  }
 }
 
 function showBlocked(message) {
