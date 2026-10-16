@@ -172,7 +172,7 @@ body.locked { overflow: hidden; }
   .signin::before { grid-column: 1 / -1; width: auto; margin: 0 -16px 8px; }
   .signin .s-act { grid-column: 1; grid-row: 2; align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .signin .s-intro { grid-column: 2; grid-row: 2; margin: 0; font-size: 13px; }
-  .signin .s-rest { grid-column: 2; grid-row: 3; }
+  .signin .s-rest { grid-column: 1 / -1; grid-row: 3; text-align: center; }
   .signin .s-rest p { margin: 0 0 8px; font-size: 13px; }
   .signin .tribute { font-size: 13px; max-width: none; }
 }
