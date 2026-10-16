@@ -126,7 +126,7 @@ function showSignIn(message = '') {
     <p class="muted s-intro">This App is made as per Global Privacy Policies, Your Data is exclusively visible to you only.</p>
     <div class="s-act">
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
-    ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Continue with Google</button>' : '<div id="gbtn"></div><p class="muted" style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
+    ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Sign In</button>' : '<div id="gbtn"></div><p class="muted" style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
     </div>
     <div class="s-rest">
     <p class="muted">This is a prediction, not a guarantee.</p>
@@ -140,7 +140,7 @@ function showSignIn(message = '') {
       client_id: GOOGLE_CLIENT_ID,
       callback: (r) => completeSignIn(r.credential),
     });
-    window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'small', shape: 'pill', text: 'continue_with' });
+    window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'small', shape: 'pill', text: 'signin' });
   };
   if (window.google?.accounts?.id) init();
   else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); init(); } }, 100); }
