@@ -130,7 +130,7 @@ function showSignIn(message = '') {
     </div>
     <div class="s-rest">
     <p class="muted">This is a prediction, not a guarantee.</p>
-    <p class="tribute">This application is a humble tribute to our great Pandit Shree Viresh Jain, whose wisdom lights the way for all who seek the stars.</p>
+    <p class="tribute"><span class="tl">This application is a humble tribute to our</span> <span class="tl">great Pandit Shree Viresh Jain, whose wisdom</span> <span class="tl">lights the way for all who seek the stars.</span></p>
     </div>
   </div></div></div>`;
   document.getElementById('gfull').addEventListener('click', startFullPageSignIn);
