@@ -140,7 +140,7 @@ function showSignIn(message = '') {
       client_id: GOOGLE_CLIENT_ID,
       callback: (r) => completeSignIn(r.credential),
     });
-    window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'small', shape: 'pill', text: 'signin' });
+    window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'signin' });
   };
   // The full-page fallback only matters when Google's button cannot load or render (in-app browsers, blockers), so it stays hidden otherwise.
   const showFallback = () => { const el = document.getElementById('gtrouble'); if (el) el.hidden = false; };
