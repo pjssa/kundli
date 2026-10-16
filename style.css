@@ -143,7 +143,7 @@ body.locked { overflow: hidden; }
 
 /* Sign-in: the artwork fills the whole viewport at its original colours (no overlay); the content sits on top. Fixed on desktop; on phones it is a block above the text; contain keeps the square artwork unzoomed on its own dark edge colour. */
 .signin { position: relative; isolation: isolate; min-height: 420px; justify-content: flex-start; }
-.signin::before { content: ''; flex: none; align-self: center; width: min(100%, 420px); aspect-ratio: 1; margin: -28px 0 0; background: #0b0f1c url('icons/icon-512.png') center / contain no-repeat; }
+.signin::before { content: ''; flex: none; align-self: center; width: 100vw; aspect-ratio: 1; margin: -28px 0 0; background: #0b0f1c url('icons/icon-512.png') center / contain no-repeat; }
 .signin h1, .signin p, .signin .btn-link { color: #f1f5f9; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
 .signin p.error { color: var(--danger); text-shadow: none; }
 .signin .tribute { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 15px; line-height: 1.6; max-width: 34ch; margin-top: 6px; }
@@ -164,7 +164,7 @@ body.locked { overflow: hidden; }
 
 /* Desktop sign-in: artwork on the left half, text on the right half. Phones keep the single centred layout. */
 @media (max-width: 899px) {
-  .wrap:has(.signin) { background: #0b0f1c; min-height: 100vh; }
+  .wrap:has(.signin) { background: #0b0f1c; min-height: 100vh; overflow-x: hidden; }
   .panel:has(.signin) { background: transparent; border: 0; }
 }
 @media (min-width: 900px) {
