@@ -179,7 +179,7 @@ body.locked { overflow: hidden; }
 @media (min-width: 900px) {
   .wrap:has(.signin) { max-width: none; padding: 0; min-height: 100vh; background: #0b0f1c; }
   .panel:has(.signin) { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
-  .signin { min-height: 100vh; width: 50%; margin-left: 50%; box-sizing: border-box; padding: 48px 56px; justify-content: center; align-items: center; text-align: center; }
+  .signin { min-height: 100vh; width: 50%; margin-left: 50%; box-sizing: border-box; padding: 48px 56px; justify-content: center; align-items: flex-start; text-align: left; }
   .signin::before { position: fixed; top: 0; left: 0; width: 50%; height: 100vh; aspect-ratio: auto; margin: 0; z-index: -1; }
   .signin .tribute { max-width: 42ch; }
 }
