@@ -141,9 +141,9 @@ body.locked { overflow: hidden; }
 .sugg-chip:hover { opacity: 1; }
 .sugg[hidden] { display: none; }
 
-/* Sign-in: the logo sits faded behind the content so the text and Google button stay readable in either theme. */
+/* Sign-in: the artwork fills the whole viewport at its original colours (no overlay); the content sits on top. Fixed so it covers desktop and mobile edge to edge. */
 .signin { position: relative; isolation: isolate; min-height: 420px; justify-content: center; }
-.signin::before { content: ''; position: absolute; inset: 0; z-index: -1; background: url('icons/icon-512.png') center / contain no-repeat; opacity: 0.22; border-radius: var(--radius-lg); }
+.signin::before { content: ''; position: fixed; inset: 0; z-index: -1; background: #0b0f1c url('icons/icon-512.png') center / cover no-repeat; }
 .signin .tribute { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 15px; line-height: 1.6; max-width: 34ch; margin-top: 6px; }
 
 .fu { margin: 12px 0 8px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-strong); }
