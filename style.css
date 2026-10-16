@@ -174,7 +174,7 @@ body.locked { overflow: hidden; }
   .signin .s-intro { grid-column: 2; grid-row: 2; margin: 0; font-size: 13px; }
   .signin .s-rest { grid-column: 1 / -1; grid-row: 3; text-align: center; }
   .signin .s-rest p { margin: 0 0 8px; font-size: 13px; }
-  .signin .s-rest .tribute { font-size: min(15.5px, 4vw); line-height: 1.5; max-width: none; }
+  .signin .s-rest .tribute { font-size: min(18px, 4.4vw); line-height: 1.5; max-width: none; margin-left: -10px; margin-right: -10px; }
   /* Exactly three rows on phones; nowrap keeps each row on one line. */
   .signin .tribute .tl { display: block; white-space: nowrap; }
 }
