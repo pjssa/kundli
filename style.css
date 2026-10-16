@@ -174,3 +174,6 @@ body.locked { overflow: hidden; }
   .signin::before { position: fixed; inset: 0 auto 0 0; width: 50%; aspect-ratio: auto; margin: 0; z-index: -1; }
   .signin .tribute { max-width: 42ch; }
 }
+
+/* The artwork already carries the name; keep the heading for screen readers only. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
