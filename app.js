@@ -140,7 +140,7 @@ function showSignIn(message = '') {
       client_id: GOOGLE_CLIENT_ID,
       callback: (r) => completeSignIn(r.credential),
     });
-    window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with' });
+    window.google.accounts.id.renderButton(document.getElementById('gbtn'), { type: 'standard', theme: 'outline', size: 'small', shape: 'pill', text: 'continue_with' });
   };
   if (window.google?.accounts?.id) init();
   else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); init(); } }, 100); }

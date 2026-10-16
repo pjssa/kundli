@@ -168,7 +168,7 @@ body.locked { overflow: hidden; }
   .panel:has(.signin) { background: transparent; border: 0; margin: 0; padding: 0; border-radius: 0; }
   .signin { padding: 0 16px 28px; }
   /* Phones: sign-in on the left, the explanatory text on the right, under the image. */
-  .signin { display: grid; grid-template-columns: 190px minmax(0, 1fr); column-gap: 12px; row-gap: 10px; align-items: center; text-align: left; }
+  .signin { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 10px; align-items: center; text-align: left; }
   .signin::before { grid-column: 1 / -1; width: auto; margin: 0 -16px 8px; }
   .signin .s-act { grid-column: 1; grid-row: 2 / span 2; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .signin .s-intro { grid-column: 2; grid-row: 2; margin: 0; font-size: 13px; }
