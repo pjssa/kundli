@@ -146,7 +146,7 @@ body.locked { overflow: hidden; }
 .signin::before { content: ''; flex: none; align-self: center; width: 100vw; aspect-ratio: 1; margin: 0; background: #0b0f1c url('icons/icon-512.png') center / contain no-repeat; }
 .signin h1, .signin p, .signin .btn-link { color: #f1f5f9; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
 .signin p.error { color: var(--danger); text-shadow: none; }
-.signin .tribute { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 15px; line-height: 1.6; max-width: 34ch; margin-top: 6px; }
+.signin .tribute { font-family: Georgia, 'Times New Roman', serif; font-style: normal; font-size: 15px; line-height: 1.6; max-width: 34ch; margin-top: 6px; }
 
 .fu { margin: 12px 0 8px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-strong); }
 .fu p { margin: 0 0 8px; font-weight: 500; }
@@ -174,7 +174,7 @@ body.locked { overflow: hidden; }
   .signin .s-intro { grid-column: 2; grid-row: 2; margin: 0; font-size: 13px; }
   .signin .s-rest { grid-column: 1 / -1; grid-row: 3; text-align: center; }
   .signin .s-rest p { margin: 0 0 8px; font-size: 13px; }
-  .signin .s-rest .tribute { font-size: min(18px, 4.4vw); line-height: 1.5; max-width: none; margin-left: -10px; margin-right: -10px; }
+  .signin .s-rest .tribute { font-size: min(18px, 4.1vw); line-height: 1.5; max-width: none; margin-left: -10px; margin-right: -10px; }
   /* Exactly three rows on phones; nowrap keeps each row on one line. */
   .signin .tribute .tl { display: block; white-space: nowrap; }
 }
