@@ -167,6 +167,14 @@ body.locked { overflow: hidden; }
   .wrap:has(.signin) { background: #0b0f1c; min-height: 100vh; overflow-x: hidden; padding: 0; }
   .panel:has(.signin) { background: transparent; border: 0; margin: 0; padding: 0; border-radius: 0; }
   .signin { padding: 0 16px 28px; }
+  /* Phones: sign-in on the left, the explanatory text on the right, under the image. */
+  .signin { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 10px; align-items: center; text-align: left; }
+  .signin::before { grid-column: 1 / -1; justify-self: center; margin-bottom: 8px; }
+  .signin .s-act { grid-column: 1; grid-row: 2 / span 2; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .signin .s-intro { grid-column: 2; grid-row: 2; margin: 0; font-size: 13px; }
+  .signin .s-rest { grid-column: 2; grid-row: 3; }
+  .signin .s-rest p { margin: 0 0 8px; font-size: 13px; }
+  .signin .tribute { font-size: 13px; max-width: none; }
 }
 @media (min-width: 900px) {
   .wrap:has(.signin) { max-width: none; padding: 0; min-height: 100vh; background: #0b0f1c; }
@@ -178,3 +186,6 @@ body.locked { overflow: hidden; }
 
 /* The artwork already carries the name; keep the heading for screen readers only. */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Desktop keeps the original stacked order: the grouping wrappers vanish. */
+@media (min-width: 900px) { .signin .s-act, .signin .s-rest { display: contents; } }

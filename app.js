@@ -123,11 +123,15 @@ function handleFullPageReturn() {
 function showSignIn(message = '') {
   app.innerHTML = `<div class="wrap"><div class="panel"><div class="signin">
     <h1 class="sr-only">Cosmic Math</h1>
-    <p class="muted">Enter your birth details and ask CosmicMath anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
+    <p class="muted s-intro">Enter your birth details and ask CosmicMath anything. Sign in with your Google account to keep your own kundli, and your family&rsquo;s. Only you can see what you save. You only need to sign in once on this device.</p>
+    <div class="s-act">
     ${message ? `<p class="error">${esc(message)}</p>` : ''}
     ${isStandalone() ? '<button type="button" class="btn-primary" id="gfull">Continue with Google</button>' : '<div id="gbtn"></div><p class="muted" style="margin-top:12px;"><button type="button" class="btn-link" id="gfull">Trouble signing in? Use a full-page sign-in</button></p>'}
+    </div>
+    <div class="s-rest">
     <p class="muted">This is a prediction, not a guarantee.</p>
     <p class="tribute">This application is a humble tribute to our great Pandit Shree Viresh Jain, whose wisdom lights the way for all who seek the stars.</p>
+    </div>
   </div></div></div>`;
   document.getElementById('gfull').addEventListener('click', startFullPageSignIn);
   if (isStandalone()) return;
