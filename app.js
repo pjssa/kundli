@@ -499,7 +499,7 @@ async function loadPeople() {
 const LANGS = [['en', 'English'], ['hinglish', 'Hinglish'], ['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
-  approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemstone: 'Gemstone', disclaimer: 'This is a prediction, not a guarantee.',
+  approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || 'en'; } catch { return 'en'; } })();
 const setLang = (c) => { lang = c || 'en'; try { localStorage.setItem('kundliLang', lang); } catch { /* ignore */ } };
@@ -524,12 +524,21 @@ function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
   return `<h4 class="h--main">${esc(L.bestTimings)}</h4>${wins.length ? `${wins.map((w) => `<p>${esc(sentence(w))}</p>`).join('')}<p class="bt-note">${esc(L.approxNote)}</p>` : `<p>${esc(next)}</p>`}`;
 }
 
+// One card per stone, all stones that suit the current period. Labels come from L so they follow the answer language.
+const GEM_ROWS = [['gemGraha', 'planet'], ['gemHouse', 'house'], ['gemPeriod', 'period'], ['gemBenefits', 'benefits'], ['gemHow', 'howToWear'], ['gemWhen', 'whenToWear'], ['gemFinger', 'finger'], ['gemMetal', 'metal'], ['gemMantra', 'mantra'], ['gemDonation', 'donation'], ['gemDay', 'day']];
+function gemstoneHtml(a, L) {
+  const gems = Array.isArray(a.gemstones) ? a.gemstones : [];
+  if (!gems.length) return a.gemstone ? `<h4 class="h--main">${esc(L.gemstone || L_EN.gemstone)}</h4><p>${esc(a.gemstone)}</p>` : '';
+  const lab = (k) => L[k] || L_EN[k];
+  return `<h4 class="h--main">${esc(lab('gemstone'))}</h4>${a.gemstone ? `<p>${esc(a.gemstone)}</p>` : ''}${gems.map((g) => `<div class="gem"><h5 class="gem-title">${esc(g.stone || '')}${g.advice === 'caution' ? ' ⚠' : ''}</h5><dl class="gem-rows">${GEM_ROWS.map(([lk, f]) => (g[f] ? `<dt>${esc(lab(lk))}</dt><dd>${esc(g[f])}</dd>` : '')).join('')}</dl></div>`).join('')}${a.gemstoneAvoid ? `<p class="gem-avoid"><b>${esc(lab('gemAvoid'))}:</b> ${esc(a.gemstoneAvoid)}</p>` : ''}`;
+}
+
 function answerHtml(e) {
   const L = (e.lang && labelCache.get(e.lang)) || L_EN;
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${a.gemstone ? `<h4 class="h--main">${esc(L.gemstone)}</h4><p>${esc(a.gemstone)}</p>` : ''}
+    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }

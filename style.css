@@ -191,3 +191,12 @@ body.locked { overflow: hidden; }
 
 /* Desktop keeps the original stacked order: the grouping wrappers vanish. */
 @media (min-width: 900px) { .signin .s-act, .signin .s-rest { display: contents; } }
+
+/* Gemstone cards: one per stone, label/value rows that stack on a phone */
+.gem { margin-top: var(--sp-2, 8px); padding: 10px 12px; border: 1px solid var(--border, rgba(128,128,128,.3)); border-radius: 10px; }
+.gem-title { margin: 0 0 6px; font-size: 1rem; }
+.gem-rows { display: grid; grid-template-columns: 8.5rem 1fr; gap: 4px 10px; margin: 0; }
+.gem-rows dt { font-weight: 600; opacity: .8; }
+.gem-rows dd { margin: 0; overflow-wrap: anywhere; }
+.gem-avoid { margin-top: var(--sp-2, 8px); }
+@media (max-width: 600px) { .gem-rows { grid-template-columns: 1fr; gap: 0; } .gem-rows dd { margin-bottom: 6px; } }
