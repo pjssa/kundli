@@ -505,7 +505,7 @@ const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
   vastuTitle: 'Vastu for your chart', vastuSeat: 'Sitting direction', vastuKeepLight: 'Keep light and clean', muhurtaBest: 'Best time', muhurtaNone: 'No good day found in these days. Ask for a longer stretch.', muhurtaNow: 'Good times today',
   protTitle: 'Protection from nazar and negative energy', protWhy: 'Why you are open to it', protDasha: 'Your running period', protSteps: 'What to do (one remedy is enough)', protAvoid: 'Avoid', protRelief: 'When it eases', protNote: 'This is traditional guidance for peace of mind. It does not replace medical or professional help.',
-  approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
+  approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemPriority: 'Priority', gemSupported: 'Supported period', gemMain: 'Main period', gemSub: 'Sub-period', gemNow: 'running now', gemStart: 'Best day to start', gemNotWith: 'Do not wear with', gemNotWithNote: 'in the same hand or on the same chain', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || 'en'; } catch { return 'en'; } })();
 const setLang = (c) => { lang = c || 'en'; try { localStorage.setItem('kundliLang', lang); } catch { /* ignore */ } };
@@ -586,11 +586,21 @@ function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
 
 // One card per stone, all stones that suit the current period. Labels come from L so they follow the answer language.
 const GEM_ROWS = [['gemGraha', 'planet'], ['gemHouse', 'house'], ['gemPeriod', 'period'], ['gemBenefits', 'benefits'], ['gemHow', 'howToWear'], ['gemWhen', 'whenToWear'], ['gemFinger', 'finger'], ['gemMetal', 'metal'], ['gemMantra', 'mantra'], ['gemDonation', 'donation'], ['gemDay', 'day']];
+
+// Rating, supported periods, start day and clashing stones come from the server (decided from the chart); this only draws them.
+function gemExtrasHtml(g, L) {
+  const lab = (k) => L[k] || L_EN[k];
+  const mon = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const day = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const per = Array.isArray(g.supported) && g.supported.length ? g.supported.map((x) => `${esc(lab(x.level === 'main' ? 'gemMain' : 'gemSub'))}: ${esc(mon(x.from))} - ${esc(mon(x.to))}${x.now ? ` (${esc(lab('gemNow'))})` : ''}`).join('<br>') : '';
+  return `${per ? `<dt>${esc(lab('gemSupported'))}</dt><dd>${per}</dd>` : ''}${g.startOn ? `<dt>${esc(lab('gemStart'))}</dt><dd>${esc(day(g.startOn.date))}</dd>` : ''}${Array.isArray(g.notWith) && g.notWith.length ? `<dt>${esc(lab('gemNotWith'))}</dt><dd>${g.notWith.map(esc).join(', ')} (${esc(lab('gemNotWithNote'))})</dd>` : ''}`;
+}
+const gemStars = (n) => '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n));
 function gemstoneHtml(a, L) {
   const gems = Array.isArray(a.gemstones) ? a.gemstones : [];
   if (!gems.length) return a.gemstone ? `<h4 class="h--main">${esc(L.gemstone || L_EN.gemstone)}</h4><p>${esc(a.gemstone)}</p>` : '';
   const lab = (k) => L[k] || L_EN[k];
-  return `<h4 class="h--main">${esc(lab('gemstone'))}</h4>${a.gemstone ? `<p>${esc(a.gemstone)}</p>` : ''}${gems.map((g) => `<div class="gem"><h5 class="gem-title">${esc(g.stone || '')}${g.advice === 'caution' ? ' ⚠' : ''}</h5><dl class="gem-rows">${GEM_ROWS.map(([lk, f]) => (g[f] ? `<dt>${esc(lab(lk))}</dt><dd>${esc(g[f])}</dd>` : '')).join('')}</dl></div>`).join('')}${a.gemstoneAvoid ? `<p class="gem-avoid"><b>${esc(lab('gemAvoid'))}:</b> ${esc(a.gemstoneAvoid)}</p>` : ''}`;
+  return `<h4 class="h--main">${esc(lab('gemstone'))}</h4>${a.gemstone ? `<p>${esc(a.gemstone)}</p>` : ''}${gems.map((g) => `<div class="gem"><h5 class="gem-title">${g.priority ? `${esc(lab('gemPriority'))} ${g.priority} · ` : ''}${esc(g.stone || '')}${g.advice === 'caution' ? ' ⚠' : ''} <span title="${g.stars || ''}/5">${g.stars ? gemStars(g.stars) : ''}</span></h5><dl class="gem-rows">${gemExtrasHtml(g, L)}${GEM_ROWS.map(([lk, f]) => (g[f] ? `<dt>${esc(lab(lk))}</dt><dd>${esc(g[f])}</dd>` : '')).join('')}</dl></div>`).join('')}${a.gemstoneAvoid ? `<p class="gem-avoid"><b>${esc(lab('gemAvoid'))}:</b> ${esc(a.gemstoneAvoid)}</p>` : ''}`;
 }
 
 function answerHtml(e) {
