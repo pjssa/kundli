@@ -219,3 +219,12 @@ body.locked { overflow: hidden; }
 .place-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .place-chip { padding: 6px 10px; border: 1px solid var(--border-strong, rgba(128,128,128,.4)); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; text-align: left; width: auto; }
 @media (pointer: coarse) { .place-chip { padding: 10px 12px; } }
+
+/* Muhurta card: best day and hour for an activity */
+.msg .muh-day { margin: 8px 0; padding: 8px 10px; border-left: 3px solid var(--accent, #c9a227); background: rgba(201, 162, 39, 0.08); border-radius: 4px; }
+.msg .muh-day ul { margin: 4px 0; padding-left: 18px; }
+.msg .muh-why { font-size: 0.85em; opacity: 0.75; }
+.msg .muh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; list-style: none; padding: 0; margin: 4px 0; font-size: 0.85em; }
+.msg .muh-best, .msg .muh-good { color: #1a7f37; }
+.msg .muh-bad { color: #b42318; }
+@media (max-width: 600px) { .msg .muh-grid { grid-template-columns: repeat(2, 1fr); } }

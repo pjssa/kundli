@@ -428,7 +428,8 @@ async function renderDetail(kundliId) {
       box.querySelectorAll('button, input').forEach((n) => { n.disabled = true; });
       box.innerHTML = '<p class="muted">CosmicMath is studying the charts&hellip;</p>';
       try {
-        const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined }));
+        const place = (await askPlace(question)) || undefined;
+        const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined, place }));
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
         if (!out) return;
         hist.unshift(out.entry); landOnAnswer = true;
@@ -468,7 +469,8 @@ async function renderDetail(kundliId) {
           return;
         }
       }
-      const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined }));
+      const place = (await askPlace(question)) || undefined;
+      const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined, place }));
       dropPending();
       if (!out) return;
       hist.unshift(out.entry); landOnAnswer = true;
@@ -501,6 +503,8 @@ async function loadPeople() {
 const LANGS = [['en', 'English'], ['hinglish', 'Hinglish'], ['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
+  muhurtaBest: 'Best day and time', muhurtaAvoid: 'Avoid', muhurtaSkip: 'Days to skip', muhurtaToday: 'Times for the day', muhurtaPeriod: 'Your running period', muhurtaNone: 'No clean day found in these days. Ask for a longer stretch.', muhurtaNote: 'Times are for the place shown, accurate to a few minutes. Not a guarantee.', rahuKaal: 'Rahu Kaal', yamaganda: 'Yamaganda', gulika: 'Gulika', abhijit: 'Abhijit (midday)', choghadiya: 'Choghadiya', hora: 'Hora', sunrise: 'Sunrise', sunset: 'Sunset', night: 'Night', day: 'Day',
+  protTitle: 'Protection from nazar and negative energy', protWhy: 'Why you are open to it', protDasha: 'Your running period', protSteps: 'What to do (one remedy is enough)', protAvoid: 'Avoid', protRelief: 'When it eases', protNote: 'This is traditional guidance for peace of mind. It does not replace medical or professional help.',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || 'en'; } catch { return 'en'; } })();
@@ -512,6 +516,55 @@ let onLangChange = null;
 const hintHtml = () => '<p class="hint muted">Ask your first question below. You can follow up on any answer, CosmicMath remembers this conversation.</p>';
 
 // Best timings sit in their own section, never merged into Period, and carry a caution so they are not read as a promise.
+
+// Day-and-hour timing for an activity: computed on the server from the panchang and this chart, never written by the AI.
+const MUHURTA_WORDS = /muhurat|mahurat|muhurta|chaughadiya|choghadiya|\bhora\b|rahu ?kaal|panchak|vichudo|vinchudo|abhijit|auspicious|shubh|good (day|time)|best (day|time)|right (day|time)|when (should|can|to)|which day|what time/i;
+function askPlace(question) {
+  let tz = '';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* no Intl zone */ }
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('kundliGeo') || 'null'); } catch { /* ignore */ }
+  if (cached && Date.now() - cached.at < 12 * 3600000) return Promise.resolve(cached.city ? { city: cached.city } : { lat: cached.lat, lon: cached.lon, tz });
+  const save = (v) => { try { localStorage.setItem('kundliGeo', JSON.stringify({ ...v, at: Date.now() })); } catch { /* quota or private window */ } };
+  // No coordinates (denied, unsupported, timed out): for a timing question ask the city once, so the times are never for the wrong place.
+  const typed = () => {
+    if (!MUHURTA_WORDS.test(question)) return null;
+    const c = (window.prompt('Which city are you in right now? Times differ by place.') || '').trim();
+    if (c.length < 2) return null;
+    save({ city: c });
+    return { city: c };
+  };
+  if (!navigator.geolocation) return Promise.resolve(typed());
+  return new Promise((resolve) => navigator.geolocation.getCurrentPosition((pos) => {
+    const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    save(loc);
+    resolve({ ...loc, tz });
+  }, () => resolve(typed()), { timeout: 8000, maximumAge: 3600000 }));
+}
+
+
+// Chart-specific nazar and negative-energy plan; only shown when the person asked, never part of the ordinary Remedy.
+function protectionHtml(pr, L = L_EN) {
+  if (!pr || !Array.isArray(pr.steps) || !pr.steps.length) return '';
+  const lab = (k) => L[k] || L_EN[k];
+  const steps = pr.steps.map((x) => `<li><b>${esc(x.planet)}:</b> ${esc(x.what)}<br><span class="muh-why">${esc(x.when)} · ${esc(x.why)}</span></li>`).join('');
+  return `<h4 class="h--main">${esc(lab('protTitle'))}</h4><p><b>${esc(lab('protWhy'))}:</b> ${esc(pr.why)}</p><p><b>${esc(lab('protDasha'))}:</b> ${esc(pr.dashaLink)}</p><p><b>${esc(lab('protSteps'))}</b></p><ol>${steps}</ol>${pr.avoid ? `<p><b>${esc(lab('protAvoid'))}:</b> ${esc(pr.avoid)}</p>` : ''}${pr.whenRelief ? `<p><b>${esc(lab('protRelief'))}:</b> ${esc(pr.whenRelief)}</p>` : ''}<p class="muh-why">${esc(lab('protNote'))}</p>`;
+}
+
+function muhurtaHtml(m, L = L_EN, P = '') {
+  if (!m || !Array.isArray(m.bestDays)) return '';
+  const lab = (k) => L[k] || L_EN[k];
+  const dd = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const days = m.bestDays.map((d) => `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b> · ${esc(d.panchang.tithi)} · ${esc(d.panchang.nakshatra)}</p><ul>${d.windows.map((w) => `<li><b>${esc(w.from)} to ${esc(w.to)}</b> · ${esc(w.choghadiya)} · ${esc(w.hora)} ${esc(lab('hora'))} · ${esc(w.lagna)}<br><span class="${P}muh-why">${esc((w.why || []).join('; '))}</span></li>`).join('')}</ul><p class="${P}muh-why">${esc(lab('muhurtaAvoid'))}: ${esc(lab('rahuKaal'))} ${esc(d.avoid)}</p></div>`).join('');
+  const skip = m.avoidDays.length ? `<p class="${P}muh-why"><b>${esc(lab('muhurtaSkip'))}:</b> ${m.avoidDays.map((d) => `${esc(dd(d.date))} (${esc(d.reasons[0])})`).join('; ')}</p>` : '';
+  const t = m.today;
+  const row = (r) => `<li class="${P}muh-${esc(r.nature || 'n')}">${esc(r.from)}-${esc(r.to)} ${esc(r.name || r.lord)}</li>`;
+  const pr = t.periods;
+  const table = `<details class="${P}muh-today"><summary>${esc(lab('muhurtaToday'))} (${esc(dd(t.date))})</summary><p>${esc(lab('sunrise'))} ${esc(pr.sunrise)} · ${esc(lab('sunset'))} ${esc(pr.sunset)}<br>${esc(lab('rahuKaal'))} ${esc(pr.rahuKaal)} · ${esc(lab('yamaganda'))} ${esc(pr.yamaganda)} · ${esc(lab('gulika'))} ${esc(pr.gulika)}${pr.abhijit ? ` · ${esc(lab('abhijit'))} ${esc(pr.abhijit)}` : ''}<br>${esc(t.panchang.tithi)} · ${esc(t.panchang.nakshatra)} · ${esc(t.panchang.yoga)} · ${esc(t.panchang.karana)}${t.flags.length ? `<br>${t.flags.map(esc).join('; ')}` : ''}</p><p><b>${esc(lab('choghadiya'))} · ${esc(lab('day'))}</b></p><ul class="${P}muh-grid">${t.choghadiyaDay.map(row).join('')}</ul><p><b>${esc(lab('choghadiya'))} · ${esc(lab('night'))}</b></p><ul class="${P}muh-grid">${t.choghadiyaNight.map(row).join('')}</ul><p><b>${esc(lab('hora'))}</b></p><ul class="${P}muh-grid">${t.hora.map(row).join('')}</ul></details>`;
+  const per = m.period && m.period.reasons.length ? `<p class="${P}muh-why"><b>${esc(lab('muhurtaPeriod'))}:</b> ${esc(m.period.reasons.join(' '))}</p>` : '';
+  return `<h4 class="h--main">${esc(lab('muhurtaBest'))} · ${esc(m.label)}</h4><p class="${P}muh-why">${esc(m.place)}</p>${per}${days || `<p>${esc(lab('muhurtaNone'))}</p>`}${skip}${table}<p class="${P}muh-why">${esc(lab('muhurtaNote'))}</p>`;
+}
+
 function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
   const wins = bt && Array.isArray(bt.windows) ? bt.windows : [];
   if (!wins.length && !next) return '';
@@ -540,7 +593,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
+    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
