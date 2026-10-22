@@ -711,6 +711,40 @@ async function openRectify(kundliId) {
   });
 }
 
+// Live check of the place of birth while typing: found, near match with suggestions, or not found.
+function wirePlaceCheck(overlay, check, P) {
+  const input = overlay.querySelector('input[name="place"]');
+  const box = overlay.querySelector('#placeStatus');
+  let timer = null, seq = 0, lastQ = null;
+  const show = (cls, html) => { box.className = `place-status place-status--${cls}`; box.innerHTML = html; };
+  const chips = (list) => list.map((s, i) => `<button type="button" class="place-chip" data-pick="${i}">${esc(s.label)}</button>`).join('');
+  const run = async () => {
+    const q = input.value.trim();
+    const mine = ++seq;
+    lastQ = q;
+    if (q.length < 2) { box.className = 'place-status'; box.textContent = ''; return; }
+    show('wait', 'Checking the place…');
+    let r;
+    try { r = await check(q); } catch { if (mine === seq) show('wait', 'Could not check the place right now. You can still save, the place is checked again then.'); return; }
+    if (mine !== seq || !r) return;
+    if (r.status === 'ok') show('ok', `&#10003; Place found: <b>${esc(r.best.label)}</b>`);
+    else if (r.status === 'check') show('check', `${r.best ? `Did you mean <b>${esc(r.best.label)}</b>? ` : ''}Tap the right one:<div class="place-chips">${chips(r.suggestions)}</div>`);
+    else if (r.status === 'notfound') show('bad', '&#10007; This place was not found. Check the spelling, or add the state or country, for example Jaipur, Rajasthan.');
+    else box.textContent = '';
+    box._list = r.suggestions || [];
+  };
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 450); });
+  // Re-rendering on blur would replace the suggestion buttons before a tap on one lands, so blur only checks text not yet checked.
+  input.addEventListener('blur', () => { clearTimeout(timer); if (input.value.trim() !== lastQ) run(); });
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pick]');
+    if (!b || !box._list) return;
+    input.value = box._list[Number(b.dataset.pick)].label;
+    run();
+  });
+  if (input.value.trim().length >= 2) run();
+}
+
 function openModal(k, done) {
   const isEdit = !!k;
   const overlay = document.createElement('div');
@@ -726,7 +760,8 @@ function openModal(k, done) {
           <label class="tu"><input type="checkbox" name="timeUnknown" ${k?.timeUnknown ? 'checked' : ''} style="width:auto;" /> (time not known)</label>
         </div>
       </div>
-      <label>Place of birth <input type="text" name="place" required placeholder="e.g. Jaipur, Rajasthan" value="${esc(k?.place || '')}" /></label>
+      <label>Place of birth <input type="text" name="place" required autocomplete="off" placeholder="e.g. Jaipur, Rajasthan" value="${esc(k?.place || '')}" /></label>
+      <div id="placeStatus" class="place-status" aria-live="polite"></div>
       <p class="muted" id="timeHint">${k?.timeUnknown ? 'We will help you find the birth time from life events.' : 'The exact birth time matters: the ascendant changes about every two hours.'}</p>
       <label>Gender (optional)<select name="gender">${['', 'Male', 'Female', 'Other'].map((g) => `<option value="${g}" ${k?.gender === g ? 'selected' : ''}>${g || 'Prefer not to say'}</option>`).join('')}</select></label>
       <p class="error" id="ferr" hidden></p>
@@ -735,6 +770,7 @@ function openModal(k, done) {
   document.body.appendChild(overlay);
   const close = () => overlay.remove();
   overlay.querySelector('#cancel').addEventListener('click', close);
+  wirePlaceCheck(overlay, (q) => guarded(() => call('kundliPublic_checkPlace', { query: q })), '');
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   const tu = overlay.querySelector('input[name="timeUnknown"]');
   const timeInput = overlay.querySelector('input[name="birthTime"]');

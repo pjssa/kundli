@@ -209,3 +209,13 @@ body.locked { overflow: hidden; }
 .rect-events { margin: 6px 0 0; padding-left: 18px; font-size: .9rem; }
 .rect-conf { margin: 12px 0 0; }
 @media (max-width: 600px) { .rect-row { grid-template-columns: 1fr auto; } .rect-row .rect-kind { grid-column: 1 / -1; } }
+
+/* Live place-of-birth check */
+.place-status { margin: 4px 0 0; font-size: .9rem; }
+.place-status--ok { color: #1F7A4D; }
+.place-status--bad { color: var(--danger, #C23D3D); }
+.place-status--check { color: var(--ink, inherit); }
+.place-status--wait { opacity: .7; }
+.place-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.place-chip { padding: 6px 10px; border: 1px solid var(--border-strong, rgba(128,128,128,.4)); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; text-align: left; width: auto; }
+@media (pointer: coarse) { .place-chip { padding: 10px 12px; } }
