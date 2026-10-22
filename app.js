@@ -503,7 +503,7 @@ async function loadPeople() {
 const LANGS = [['en', 'English'], ['hinglish', 'Hinglish'], ['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
-  muhurtaBest: 'Best day and time', muhurtaAvoid: 'Avoid', muhurtaSkip: 'Days to skip', muhurtaToday: 'Times for the day', muhurtaPeriod: 'Your running period', muhurtaNone: 'No clean day found in these days. Ask for a longer stretch.', muhurtaNote: 'Times are for the place shown, accurate to a few minutes. Not a guarantee.', rahuKaal: 'Rahu Kaal', yamaganda: 'Yamaganda', gulika: 'Gulika', abhijit: 'Abhijit (midday)', choghadiya: 'Choghadiya', hora: 'Hora', sunrise: 'Sunrise', sunset: 'Sunset', night: 'Night', day: 'Day',
+  muhurtaBest: 'Best time', muhurtaNone: 'No good day found in these days. Ask for a longer stretch.', muhurtaNow: 'Good times today',
   protTitle: 'Protection from nazar and negative energy', protWhy: 'Why you are open to it', protDasha: 'Your running period', protSteps: 'What to do (one remedy is enough)', protAvoid: 'Avoid', protRelief: 'When it eases', protNote: 'This is traditional guidance for peace of mind. It does not replace medical or professional help.',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
@@ -555,14 +555,10 @@ function muhurtaHtml(m, L = L_EN, P = '') {
   if (!m || !Array.isArray(m.bestDays)) return '';
   const lab = (k) => L[k] || L_EN[k];
   const dd = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
-  const days = m.bestDays.map((d) => `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b> · ${esc(d.panchang.tithi)} · ${esc(d.panchang.nakshatra)}</p><ul>${d.windows.map((w) => `<li><b>${esc(w.from)} to ${esc(w.to)}</b> · ${esc(w.choghadiya)} · ${esc(w.hora)} ${esc(lab('hora'))} · ${esc(w.lagna)}<br><span class="${P}muh-why">${esc((w.why || []).join('; '))}</span></li>`).join('')}</ul><p class="${P}muh-why">${esc(lab('muhurtaAvoid'))}: ${esc(lab('rahuKaal'))} ${esc(d.avoid)}</p></div>`).join('');
-  const skip = m.avoidDays.length ? `<p class="${P}muh-why"><b>${esc(lab('muhurtaSkip'))}:</b> ${m.avoidDays.map((d) => `${esc(dd(d.date))} (${esc(d.reasons[0])})`).join('; ')}</p>` : '';
-  const t = m.today;
-  const row = (r) => `<li class="${P}muh-${esc(r.nature || 'n')}">${esc(r.from)}-${esc(r.to)} ${esc(r.name || r.lord)}</li>`;
-  const pr = t.periods;
-  const table = `<details class="${P}muh-today"><summary>${esc(lab('muhurtaToday'))} (${esc(dd(t.date))})</summary><p>${esc(lab('sunrise'))} ${esc(pr.sunrise)} · ${esc(lab('sunset'))} ${esc(pr.sunset)}<br>${esc(lab('rahuKaal'))} ${esc(pr.rahuKaal)} · ${esc(lab('yamaganda'))} ${esc(pr.yamaganda)} · ${esc(lab('gulika'))} ${esc(pr.gulika)}${pr.abhijit ? ` · ${esc(lab('abhijit'))} ${esc(pr.abhijit)}` : ''}<br>${esc(t.panchang.tithi)} · ${esc(t.panchang.nakshatra)} · ${esc(t.panchang.yoga)} · ${esc(t.panchang.karana)}${t.flags.length ? `<br>${t.flags.map(esc).join('; ')}` : ''}</p><p><b>${esc(lab('choghadiya'))} · ${esc(lab('day'))}</b></p><ul class="${P}muh-grid">${t.choghadiyaDay.map(row).join('')}</ul><p><b>${esc(lab('choghadiya'))} · ${esc(lab('night'))}</b></p><ul class="${P}muh-grid">${t.choghadiyaNight.map(row).join('')}</ul><p><b>${esc(lab('hora'))}</b></p><ul class="${P}muh-grid">${t.hora.map(row).join('')}</ul></details>`;
-  const per = m.period && m.period.reasons.length ? `<p class="${P}muh-why"><b>${esc(lab('muhurtaPeriod'))}:</b> ${esc(m.period.reasons.join(' '))}</p>` : '';
-  return `<h4 class="h--main">${esc(lab('muhurtaBest'))} · ${esc(m.label)}</h4><p class="${P}muh-why">${esc(m.place)}</p>${per}${days || `<p>${esc(lab('muhurtaNone'))}</p>`}${skip}${table}<p class="${P}muh-why">${esc(lab('muhurtaNote'))}</p>`;
+  const days = m.bestDays.map((d) => `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b>${d.line ? ` <span class="${P}muh-why">${esc(d.line)}</span>` : ''}</p><ul>${d.windows.map((w) => `<li>${esc(w.from)} to ${esc(w.to)} <span class="${P}muh-why">${esc(w.slot)}</span></li>`).join('')}</ul></div>`).join('');
+  const now = Array.isArray(m.goodSlots) && m.goodSlots.length ? `<p><b>${esc(lab('muhurtaNow'))}</b></p><ul>${m.goodSlots.map((x) => `<li>${esc(x.from)} to ${esc(x.to)} <span class="${P}muh-why">${esc(x.name)}</span></li>`).join('')}</ul>` : '';
+  const body = m.activity === 'general' && now ? now : (days || `<p>${esc(lab('muhurtaNone'))}</p>`);
+  return `<h4 class="h--main">${esc(lab('muhurtaBest'))} · ${esc(m.label)}</h4><p class="${P}muh-why">${esc(m.place)}</p>${body}`;
 }
 
 function bestTimingsHtml(bt, L = L_EN, loc = '', next = '') {
