@@ -503,7 +503,7 @@ async function loadPeople() {
 const LANGS = [['en', 'English'], ['hinglish', 'Hinglish'], ['hi', 'हिन्दी'], ['gu', 'ગુજરાતી'], ['mr', 'मराठी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['te', 'తెలుగు'], ['kn', 'ಕನ್ನಡ'], ['ml', 'മലയാളം'], ['pa', 'ਪੰਜਾਬੀ'], ['ur', 'اردو']];
 const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
-  muhurtaBest: 'Best time', muhurtaNone: 'No good day found in these days. Ask for a longer stretch.', muhurtaNow: 'Good times today',
+  vastuTitle: 'Vastu for your chart', vastuSeat: 'Sitting direction', vastuKeepLight: 'Keep light and clean', muhurtaBest: 'Best time', muhurtaNone: 'No good day found in these days. Ask for a longer stretch.', muhurtaNow: 'Good times today',
   protTitle: 'Protection from nazar and negative energy', protWhy: 'Why you are open to it', protDasha: 'Your running period', protSteps: 'What to do (one remedy is enough)', protAvoid: 'Avoid', protRelief: 'When it eases', protNote: 'This is traditional guidance for peace of mind. It does not replace medical or professional help.',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
@@ -551,6 +551,15 @@ function protectionHtml(pr, L = L_EN) {
   return `<h4 class="h--main">${esc(lab('protTitle'))}</h4><p><b>${esc(lab('protWhy'))}:</b> ${esc(pr.why)}</p><p><b>${esc(lab('protDasha'))}:</b> ${esc(pr.dashaLink)}</p><p><b>${esc(lab('protSteps'))}</b></p><ol>${steps}</ol>${pr.avoid ? `<p><b>${esc(lab('protAvoid'))}:</b> ${esc(pr.avoid)}</p>` : ''}${pr.whenRelief ? `<p><b>${esc(lab('protRelief'))}:</b> ${esc(pr.whenRelief)}</p>` : ''}<p class="muh-why">${esc(lab('protNote'))}</p>`;
 }
 
+
+// Chart-specific vastu answer; only shown when the person asked, never part of the Remedy.
+function vastuHtml(v, L = L_EN) {
+  if (!v || !Array.isArray(v.items) || !v.items.length) return '';
+  const lab = (k) => L[k] || L_EN[k];
+  const items = v.items.map((x) => `<li><b>${esc(x.place)}: ${esc(x.direction)}</b><br><span class="muh-why">${esc(x.why)}</span></li>`).join('');
+  return `<h4 class="h--main">${esc(lab('vastuTitle'))}</h4><ul>${items}</ul>${v.seat ? `<p><b>${esc(lab('vastuSeat'))}:</b> ${esc(v.seat)}</p>` : ''}${v.keepLight ? `<p><b>${esc(lab('vastuKeepLight'))}:</b> ${esc(v.keepLight)}</p>` : ''}`;
+}
+
 function muhurtaHtml(m, L = L_EN, P = '') {
   if (!m || !Array.isArray(m.bestDays)) return '';
   const lab = (k) => L[k] || L_EN[k];
@@ -589,7 +598,7 @@ function answerHtml(e) {
   const a = e.answer || {};
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
+    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
       <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
