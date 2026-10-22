@@ -16,7 +16,7 @@ const SOUTH_GRID = [[11, 0, 1, 2], [10, null, null, 3], [9, null, null, 4], [8, 
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
-const fmtBirth = (k) => `${fmtDate(k.birthDate + 'T12:00:00')} · ${k.birthTime}`;
+const fmtBirth = (k) => `${fmtDate(k.birthDate + 'T12:00:00')} · ${k.timeUnknown && k.rectification?.status !== 'applied' ? 'time not known' : `${k.birthTime}${k.timeUnknown ? ' (estimated)' : ''}`}`;
 
 // ---------------------------------------------------------------- auth
 
@@ -240,6 +240,7 @@ async function renderDetail(kundliId) {
     <div class="top"><h1>${esc(k.name)}</h1>
       <div style="display:flex;gap:8px;"><button class="btn-secondary btn-small" id="edit">Edit</button><button class="btn-danger btn-small" id="del">Delete</button></div></div>
     <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
+    ${k.timeUnknown ? `<div class="timebanner"><span>${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events, so answers about houses are approximate.` : 'Birth time not known, so answers are approximate until you find it.'}</span><button type="button" class="btn-secondary btn-small" id="rectifyBtn">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></div>` : ''}
 
     <div class="panel chat" id="chat">
       <div class="top"><h2 style="margin:0;">Ask CosmicMath</h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
@@ -290,6 +291,7 @@ async function renderDetail(kundliId) {
 
   document.getElementById('back').addEventListener('click', renderList);
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
+  document.getElementById('rectifyBtn')?.addEventListener('click', () => openRectify(k.kundliId));
   document.getElementById('del').addEventListener('click', async (e) => {
     if (!window.confirm(`Delete ${k.name} and the saved chat? This cannot be undone.`)) return;
     e.target.disabled = true;
@@ -636,6 +638,79 @@ function openLanguage() {
   }));
 }
 
+// ------------------------------------------------------------ birth time rectification
+// For people who do not know their birth time: they remember dated life events and the server tests every candidate time.
+const TIME_WINDOWS = [['', 'Not sure, any time of the day'], ['00:00-06:00', 'Night or early morning (12 am to 6 am)'], ['06:00-12:00', 'Morning (6 am to 12 pm)'], ['12:00-18:00', 'Afternoon (12 pm to 6 pm)'], ['18:00-24:00', 'Evening or night (6 pm to 12 am)']];
+const CONF_TEXT = { high: 'Good match', medium: 'Fair match', low: 'Weak match, add more events' };
+
+function rectResultsHtml(r) {
+  if (!r?.windows?.length) return '';
+  const applied = r.status === 'applied';
+  return `<p class="rect-conf rect-conf--${esc(r.confidence)}"><b>${esc(CONF_TEXT[r.confidence] || '')}.</b> These are the likely rising-sign windows. A remembered date is rarely exact, so treat the result as an estimate.</p>
+    ${r.windows.map((w, i) => `<div class="gem"><h5 class="gem-title">${i === 0 ? 'Most likely: ' : ''}${esc(w.lagna)} rising &middot; ${esc(w.from)} to ${esc(w.to)} &middot; ${w.matchPercent}% fit</h5>
+      ${w.events ? `<ul class="rect-events">${w.events.map((e) => `<li>${esc(e.label)} (${esc(e.date)}): ${esc(e.maha)} / ${esc(e.antar)} period, <b>${esc(e.fit)}</b> fit</li>`).join('')}</ul>` : ''}
+      <div class="rect-use"><input type="time" value="${esc(w.suggested)}" data-rect-time="${i}" aria-label="Birth time inside this window" /><button type="button" class="btn-primary btn-small" data-rect-use="${i}">${applied && r.appliedTime >= w.from && r.appliedTime <= w.to ? 'Using this time' : 'Use this time'}</button></div></div>`).join('')}`;
+}
+
+async function openRectify(kundliId) {
+  let k;
+  try { const out = await guarded(() => call('kundliPublic_get', { kundliId })); if (!out) return; k = out.kundli; } catch (err) { window.alert(err.message); return; }
+  const r0 = k.rectification;
+  const kinds = k.rectifyKinds || [];
+  const eventRow = (e = {}) => `<div class="rect-row"><select class="rect-kind" aria-label="Type of event"><option value="">Type of event</option>${kinds.map((x) => `<option value="${esc(x.kind)}" ${e.kind === x.kind ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select><input type="date" class="rect-date" aria-label="Date of the event" value="${esc(e.date || '')}" /><button type="button" class="btn-secondary btn-small rect-rm" aria-label="Remove this event">&times;</button></div>`;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
+  overlay.innerHTML = `
+    <div class="panel" style="max-width:560px;width:100%;margin-top:24px;">
+      <div class="top"><h2 style="margin:0;">Find ${esc(k.name)}'s birth time</h2><button type="button" class="btn-link modal-close" aria-label="Close">&times;</button></div>
+      <div>
+        <p class="muted">Add big events from life with their dates, such as marriage, a child's birth, a first job, buying a house, moving abroad, a serious illness or losing a parent. Every possible birth time is tested against them. Three or more events with dates close to the real ones work best.</p>
+        <label>Birth time, as far as anyone remembers
+          <select id="rectWindow">${TIME_WINDOWS.map(([v, n]) => `<option value="${v}" ${r0 && `${r0.from}-${r0.to}` === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        </label>
+        <div id="rectRows">${(r0?.events?.length ? r0.events : [{}, {}, {}]).map(eventRow).join('')}</div>
+        <button type="button" class="btn-secondary btn-small" id="rectAdd">+ Add event</button>
+        <p class="error" id="rectError" hidden></p>
+        <div class="actions">
+          <button type="button" class="btn-secondary" id="rectSkip">Skip for now</button>
+          <button type="button" class="btn-primary" id="rectGo">Find likely birth time</button>
+        </div>
+        <div id="rectResults">${rectResultsHtml(r0)}</div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => { overlay.remove(); };
+  const finish = () => { overlay.remove(); renderDetail(kundliId); };
+  const err = overlay.querySelector('#rectError');
+  overlay.querySelector('.modal-close').addEventListener('click', finish);
+  overlay.querySelector('#rectSkip').addEventListener('click', finish);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) finish(); });
+  const rows = overlay.querySelector('#rectRows');
+  overlay.querySelector('#rectAdd').addEventListener('click', () => { if (rows.children.length < 10) rows.insertAdjacentHTML('beforeend', eventRow()); });
+  rows.addEventListener('click', (e) => { if (e.target.classList.contains('rect-rm') && rows.children.length > 1) e.target.closest('.rect-row').remove(); });
+  let current = r0;
+  overlay.querySelector('#rectGo').addEventListener('click', async (e) => {
+    err.hidden = true;
+    const events = [...rows.children].map((row) => ({ kind: row.querySelector('.rect-kind').value, date: row.querySelector('.rect-date').value })).filter((x) => x.kind || x.date);
+    const [from, to] = (overlay.querySelector('#rectWindow').value || '').split('-');
+    e.target.disabled = true; e.target.textContent = 'Testing every possible time…';
+    try {
+      const out = await guarded(() => call('kundliPublic_rectify', { kundliId, events, from: from || undefined, to: to || undefined }));
+      if (!out) { close(); return; }
+      current = out.rectification;
+      overlay.querySelector('#rectResults').innerHTML = rectResultsHtml(current);
+    } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+    e.target.disabled = false; e.target.textContent = 'Find likely birth time';
+  });
+  overlay.querySelector('#rectResults').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-rect-use]');
+    if (!b || !current) return;
+    const time = overlay.querySelector(`[data-rect-time="${b.dataset.rectUse}"]`).value;
+    b.disabled = true; b.textContent = 'Saving…';
+    try { const done = await guarded(() => call('kundliPublic_rectifyApply', { kundliId, time })); if (!done) { close(); return; } finish(); } catch (ex) { err.textContent = ex.message; err.hidden = false; b.disabled = false; b.textContent = 'Use this time'; }
+  });
+}
+
 function openModal(k, done) {
   const isEdit = !!k;
   const overlay = document.createElement('div');
@@ -646,10 +721,13 @@ function openModal(k, done) {
       <label>Name <input type="text" name="name" required value="${esc(k?.name || '')}" /></label>
       <div class="row">
         <label>Date of birth <input type="date" name="birthDate" required value="${esc(k?.birthDate?.slice(0, 10) || '')}" /></label>
-        <label>Time of birth <input type="time" name="birthTime" required value="${esc(k?.birthTime || '')}" /></label>
+        <div>
+          <label>Time of birth <input type="time" name="birthTime" ${k?.timeUnknown ? 'disabled' : 'required'} value="${esc(k?.timeUnknown ? '' : k?.birthTime || '')}" /></label>
+          <label class="tu"><input type="checkbox" name="timeUnknown" ${k?.timeUnknown ? 'checked' : ''} style="width:auto;" /> (time not known)</label>
+        </div>
       </div>
       <label>Place of birth <input type="text" name="place" required placeholder="e.g. Jaipur, Rajasthan" value="${esc(k?.place || '')}" /></label>
-      <p class="muted">The exact birth time matters: the ascendant changes about every two hours.</p>
+      <p class="muted" id="timeHint">${k?.timeUnknown ? 'We will help you find the birth time from life events.' : 'The exact birth time matters: the ascendant changes about every two hours.'}</p>
       <label>Gender (optional)<select name="gender">${['', 'Male', 'Female', 'Other'].map((g) => `<option value="${g}" ${k?.gender === g ? 'selected' : ''}>${g || 'Prefer not to say'}</option>`).join('')}</select></label>
       <p class="error" id="ferr" hidden></p>
       <div class="actions"><button type="button" class="btn-secondary" id="cancel">Cancel</button><button type="submit" class="btn-primary">${isEdit ? 'Save changes' : 'Create'}</button></div>
@@ -658,6 +736,12 @@ function openModal(k, done) {
   const close = () => overlay.remove();
   overlay.querySelector('#cancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  const tu = overlay.querySelector('input[name="timeUnknown"]');
+  const timeInput = overlay.querySelector('input[name="birthTime"]');
+  tu.addEventListener('change', () => {
+    timeInput.disabled = tu.checked; timeInput.required = !tu.checked; if (tu.checked) timeInput.value = '';
+    overlay.querySelector('#timeHint').textContent = tu.checked ? 'We will help you find the birth time from life events.' : 'The exact birth time matters: the ascendant changes about every two hours.';
+  });
   overlay.querySelector('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -667,9 +751,11 @@ function openModal(k, done) {
     btn.disabled = true; btn.textContent = 'Finding place…';
     try {
       // Coordinates and time zone are worked out server-side from the place.
-      const out = await guarded(() => call('kundliPublic_save', { kundliId: k?.kundliId, name: fd.get('name'), gender: fd.get('gender'), birthDate: fd.get('birthDate'), birthTime: fd.get('birthTime'), place: fd.get('place') }));
+      const out = await guarded(() => call('kundliPublic_save', { kundliId: k?.kundliId, name: fd.get('name'), gender: fd.get('gender'), birthDate: fd.get('birthDate'), birthTime: fd.get('birthTime'), timeUnknown: fd.get('timeUnknown') === 'on', place: fd.get('place') }));
       if (!out) { close(); return; }
       close();
+      // A new kundli without a birth time goes straight to finding it; an edit only does when no time has been settled yet.
+      if (fd.get('timeUnknown') === 'on' && (!isEdit || k?.rectification?.status !== 'applied')) { openRectify(out.kundliId); return; }
       if (isEdit) done(); else renderDetail(out.kundliId);
     } catch (err) {
       errEl.textContent = err.message; errEl.hidden = false;

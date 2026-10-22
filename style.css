@@ -200,3 +200,12 @@ body.locked { overflow: hidden; }
 .gem-rows dd { margin: 0; overflow-wrap: anywhere; }
 .gem-avoid { margin-top: var(--sp-2, 8px); }
 @media (max-width: 600px) { .gem-rows { grid-template-columns: 1fr; gap: 0; } .gem-rows dd { margin-bottom: 6px; } }
+
+/* Time not known + rectification */
+.timebanner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border, rgba(128,128,128,.3)); border-radius: 10px; }
+.tu { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: .9rem; }
+.rect-row { display: grid; grid-template-columns: 1fr 9.5rem auto; gap: 6px; margin-top: 6px; }
+.rect-use { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.rect-events { margin: 6px 0 0; padding-left: 18px; font-size: .9rem; }
+.rect-conf { margin: 12px 0 0; }
+@media (max-width: 600px) { .rect-row { grid-template-columns: 1fr auto; } .rect-row .rect-kind { grid-column: 1 / -1; } }
