@@ -262,8 +262,11 @@ async function renderDetail(kundliId) {
       <form id="suitForm" class="suit-form">
         <select id="suitKind" aria-label="What to check"><option value="name">Name</option><option value="mobile">Mobile number</option><option value="company">Company name</option></select>
         <input id="suitVal" type="text" maxlength="80" placeholder="${SUIT_HINT.name}" aria-label="Name, number or company to check" />
+        <input id="suitDate" type="date" hidden aria-label="Date of incorporation" title="Date of incorporation" />
+        <input id="suitPlace" type="text" maxlength="80" hidden placeholder="Place of incorporation, e.g. Pune" aria-label="Place of incorporation" />
         <button class="btn-primary" id="suitGo" type="submit">Check</button>
       </form>
+      <p class="muted" id="suitCoHint" hidden>For a company you can add the date and place it was incorporated, for a deeper reading. No time is needed.</p>
       <p class="error" id="suitErr" hidden></p>
       <div class="suit-out msg msg--pandit" id="suitOut" hidden></div>
     </div>
@@ -273,7 +276,11 @@ async function renderDetail(kundliId) {
   </div>`;
   wireFooter();
   const suitKind = document.getElementById('suitKind');
-  suitKind.addEventListener('change', () => { document.getElementById('suitVal').placeholder = SUIT_HINT[suitKind.value]; });
+  suitKind.addEventListener('change', () => {
+    document.getElementById('suitVal').placeholder = SUIT_HINT[suitKind.value];
+    const co = suitKind.value === 'company';
+    for (const id of ['suitDate', 'suitPlace', 'suitCoHint']) document.getElementById(id).hidden = !co;
+  });
   document.getElementById('suitForm').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const val = document.getElementById('suitVal').value.trim();
@@ -282,7 +289,7 @@ async function renderDetail(kundliId) {
     if (!val) { err.textContent = 'Please type what to check.'; err.hidden = false; return; }
     go.disabled = true; go.textContent = 'Checking\u2026';
     try {
-      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind: suitKind.value, value: val }));
+      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind: suitKind.value, value: val, ...(suitKind.value === 'company' ? { incorporationDate: document.getElementById('suitDate').value || undefined, incorporationPlace: document.getElementById('suitPlace').value.trim() || undefined } : {}) }));
       if (r) { out.innerHTML = suitabilityHtml(r); out.hidden = false; }
     } catch (ex) { err.textContent = ex.message; err.hidden = false; out.hidden = true; }
     go.disabled = false; go.textContent = 'Check';
@@ -639,6 +646,32 @@ function suitabilityHtml(r) {
   const list = r.areaList || SUIT_AREAS;
   const what = r.kind === 'mobile' ? 'Mobile number' : r.kind === 'company' ? 'Company name' : 'Name';
   const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4>`, ...list.map(([k, label]) => `<p>${label}: <b>${esc(c.areas[k])}</b></p>`)];
+  // A company with a date of incorporation: its own Moon nakshatra, the name against it, the owner fit and this year's transits.
+  const cc = c.companyChart;
+  if (cc) {
+    lines.push(`<h4 class="h--main">Company chart (from ${esc(cc.date)})</h4>`);
+    lines.push(`<p>Moon on that date: ${cc.moons.map((m) => `<b>${esc(m.nakshatra)}</b> (${esc(m.rashi)}${cc.moons.length > 1 ? `, ${m.percent}%` : ''})`).join(', ')}</p>`);
+    if (cc.note) lines.push(`<p class="muted">${esc(cc.note)}</p>`);
+    if (cc.placeFallback) lines.push(`<p class="muted">The place was not given or not found, so the time zone of your birth place was used.</p>`);
+    const nm = cc.name;
+    if (nm.found) lines.push(`<p>The name starts with <b>${esc(nm.sound)}</b>, in <b>${esc(nm.nakshatra)}</b> (${esc(nm.rashi)}, ruled by ${esc(nm.lord)}).</p>`);
+    else lines.push(`<p>This first sound is not in the nakshatra naming table, so the name is read by its numbers only.</p>`);
+    const add = (title, o) => { for (const t of o.benefits || []) lines.push(`<p><b>Benefit${title}:</b> ${esc(t)}</p>`); for (const t of o.cautions || []) lines.push(`<p><b>Caution${title}:</b> ${esc(t)}</p>`); };
+    add(' (name)', nm); add(' (you and the company)', cc.owner); add(' (this year)', cc.transit);
+    if (nm.bestStarts && nm.bestStarts.length) lines.push(`<p>Best starting sounds for the company's nakshatra: <b>${esc(nm.bestStarts.join(', '))}</b></p>`);
+  }
+  // A personal name is judged first by its first sound: nakshatra, tara from the birth nakshatra, rashi and the nakshatra lord.
+  const nk = c.nakshatra;
+  if (nk) {
+    lines.push(`<h4 class="h--main">Name and nakshatra (${esc(nk.overall || 'Not placed')})</h4>`);
+    if (nk.found) {
+      lines.push(`<p>The name starts with <b>${esc(nk.sound)}</b>, in <b>${esc(nk.nakshatra)}</b> pada ${nk.pada} (${esc(nk.rashi)}, ruled by ${esc(nk.lord)}). Your birth nakshatra is ${esc(nk.birthNakshatra)}.</p>`);
+      if (nk.alsoIn && nk.alsoIn.length) lines.push(`<p>This sound is also used in ${esc(nk.alsoIn.join(', '))}.</p>`);
+      for (const t of nk.benefits) lines.push(`<p><b>Benefit:</b> ${esc(t)}</p>`);
+      for (const t of nk.cautions) lines.push(`<p><b>Caution:</b> ${esc(t)}</p>`);
+    } else lines.push(`<p>This first sound is not in the nakshatra naming table, so only the number reading is used.</p>`);
+    if (nk.bestStarts && nk.bestStarts.length) lines.push(`<p>Best starting sounds for your birth nakshatra (${esc(nk.birthNakshatra)}): <b>${esc(nk.bestStarts.join(', '))}</b></p>`);
+  }
   // The Vedic reading behind the verdict: the planet this number stands for, where it sits in the chart, and what it gives and costs.
   for (const rd of c.readings || []) {
     lines.push(`<h4 class="h--main">${esc(rd.label)}: number ${rd.number}, ${esc(rd.planet)} (${esc(rd.overall)})</h4><p>${esc(rd.placement)}</p>`);
