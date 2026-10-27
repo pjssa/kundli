@@ -639,12 +639,19 @@ function suitabilityHtml(r) {
   const list = r.areaList || SUIT_AREAS;
   const what = r.kind === 'mobile' ? 'Mobile number' : r.kind === 'company' ? 'Company name' : 'Name';
   const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4>`, ...list.map(([k, label]) => `<p>${label}: <b>${esc(c.areas[k])}</b></p>`)];
+  // The Vedic reading behind the verdict: the planet this number stands for, where it sits in the chart, and what it gives and costs.
+  for (const rd of c.readings || []) {
+    lines.push(`<h4 class="h--main">${esc(rd.label)}: number ${rd.number}, ${esc(rd.planet)} (${esc(rd.overall)})</h4><p>${esc(rd.placement)}</p>`);
+    for (const t of rd.benefits) lines.push(`<p><b>Benefit:</b> ${esc(t)}</p>`);
+    for (const t of rd.cautions) lines.push(`<p><b>Caution:</b> ${esc(t)}</p>`);
+  }
+  if (r.bestNumbers && r.bestNumbers.length) lines.push(`<p>Numbers that suit your chart best: <b>${esc(r.bestNumbers.map((b) => `${b.number} (${b.planet})`).join(', '))}</b></p>`);
   if (c.start) lines.push(`<p>Starting sound (${esc(c.start.nakshatra)} nakshatra): <b>${c.start.ok ? 'Matches' : 'Does not match'}</b>${c.start.ok ? '' : ` &middot; favoured starts: ${esc(c.start.starts.join(', '))}`}</p>`);
   // Corrections only where they help: a name or company that is not already favourable in every area.
   if (r.kind !== 'mobile' && list.some(([k]) => c.areas[k] !== 'Favourable')) {
     lines.push(`<h4 class="h--main">Spelling corrections</h4>`);
     lines.push(r.suggestions.length
-      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b><br>${suitLine(x.areas, list)}</p>`).join('')
+      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b><br>${suitLine(x.areas, list)}${x.numbers ? `<br>${esc(x.numbers)}` : ''}</p>`).join('')
       : `<p>No spelling change that keeps the pronunciation improves it.</p>`);
   }
   lines.push(`<p class="bt-note disc">This is a prediction, not a guarantee.</p>`);
