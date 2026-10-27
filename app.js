@@ -632,16 +632,19 @@ function planetTableHtml(chart) {
 // ---------------------------------------------------------------- name, mobile number and company check
 const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
 const SUIT_AREAS = [['health', 'Health'], ['wealth', 'Wealth'], ['relations', 'Relations']];
-const suitLine = (areas) => SUIT_AREAS.map(([k, label]) => `${label}: <b>${esc(areas[k])}</b>`).join(' &middot; ');
+const suitLine = (areas, list = SUIT_AREAS) => list.map(([k, label]) => `${label}: <b>${esc(areas[k])}</b>`).join(' &middot; ');
 function suitabilityHtml(r) {
   const c = r.current;
+  // Each kind is read for its own areas (a company for business, a phone for work too), so the server sends the list.
+  const list = r.areaList || SUIT_AREAS;
   const what = r.kind === 'mobile' ? 'Mobile number' : r.kind === 'company' ? 'Company name' : 'Name';
-  const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4>`, ...SUIT_AREAS.map(([k, label]) => `<p>${label}: <b>${esc(c.areas[k])}</b></p>`)];
+  const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4>`, ...list.map(([k, label]) => `<p>${label}: <b>${esc(c.areas[k])}</b></p>`)];
+  if (c.start) lines.push(`<p>Starting sound (${esc(c.start.nakshatra)} nakshatra): <b>${c.start.ok ? 'Matches' : 'Does not match'}</b>${c.start.ok ? '' : ` &middot; favoured starts: ${esc(c.start.starts.join(', '))}`}</p>`);
   // Corrections only where they help: a name or company that is not already favourable in every area.
-  if (r.kind !== 'mobile' && SUIT_AREAS.some(([k]) => c.areas[k] !== 'Favourable')) {
+  if (r.kind !== 'mobile' && list.some(([k]) => c.areas[k] !== 'Favourable')) {
     lines.push(`<h4 class="h--main">Spelling corrections</h4>`);
     lines.push(r.suggestions.length
-      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b><br>${suitLine(x.areas)}</p>`).join('')
+      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b><br>${suitLine(x.areas, list)}</p>`).join('')
       : `<p>No spelling change that keeps the pronunciation improves it.</p>`);
   }
   lines.push(`<p class="bt-note disc">This is a prediction, not a guarantee.</p>`);
