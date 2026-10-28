@@ -473,20 +473,7 @@ async function renderDetail(kundliId) {
     </div>
 
     <div class="pane" data-pane="check">
-    <div class="panel" id="suitPanel">
-      <h2 style="margin:0 0 6px;">Name, number &amp; company check</h2>
-      <p class="muted">See whether a name, mobile number or company name suits ${esc(k.name)}, by numerology and the birth chart, with spelling corrections.</p>
-      <form id="suitForm" class="suit-form">
-        <select id="suitKind" aria-label="What to check"><option value="name">Name</option><option value="mobile">Mobile number</option><option value="company">Company name</option></select>
-        <input id="suitVal" type="text" maxlength="80" placeholder="${SUIT_HINT.name}" aria-label="Name, number or company to check" />
-        <input id="suitDate" type="date" hidden aria-label="Date of incorporation" title="Date of incorporation" />
-        <input id="suitPlace" type="text" maxlength="80" hidden placeholder="Place of incorporation, e.g. Pune" aria-label="Place of incorporation" />
-        <button class="btn-primary" id="suitGo" type="submit">Check</button>
-      </form>
-      <p class="muted" id="suitCoHint" hidden>For a company you can add the date and place it was incorporated, for a deeper reading. No time is needed.</p>
-      <p class="error" id="suitErr" hidden></p>
-      <div class="suit-out msg msg--pandit" id="suitOut" hidden></div>
-    </div>
+    ${SUIT_KINDS.map((kd) => suitTileHtml(kd, k)).join('')}
     </div>
 
     <div class="pane" data-pane="chart">
@@ -498,25 +485,20 @@ async function renderDetail(kundliId) {
   wireFooter();
   wireTabs();
   showTab(detailTab);
-  const suitKind = document.getElementById('suitKind');
-  suitKind.addEventListener('change', () => {
-    document.getElementById('suitVal').placeholder = SUIT_HINT[suitKind.value];
-    const co = suitKind.value === 'company';
-    for (const id of ['suitDate', 'suitPlace', 'suitCoHint']) document.getElementById(id).hidden = !co;
-  });
-  document.getElementById('suitForm').addEventListener('submit', async (ev) => {
+  app.querySelectorAll('.suit-form').forEach((form) => form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const val = document.getElementById('suitVal').value.trim();
-    const err = document.getElementById('suitErr'), out = document.getElementById('suitOut'), go = document.getElementById('suitGo');
+    const kind = form.dataset.kind, tile = form.closest('.suit-tile');
+    const val = form.querySelector('.suit-val').value.trim();
+    const err = tile.querySelector('.suit-err'), out = tile.querySelector('.suit-out'), go = form.querySelector('.suit-go');
     err.hidden = true;
     if (!val) { err.textContent = 'Please type what to check.'; err.hidden = false; return; }
     go.disabled = true; go.textContent = 'Checking\u2026';
     try {
-      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind: suitKind.value, value: val, ...(suitKind.value === 'company' ? { incorporationDate: document.getElementById('suitDate').value || undefined, incorporationPlace: document.getElementById('suitPlace').value.trim() || undefined } : {}) }));
+      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind, value: val, ...(kind === 'company' ? { incorporationDate: form.querySelector('.suit-date').value || undefined, incorporationPlace: form.querySelector('.suit-place').value.trim() || undefined } : {}) }));
       if (r) { out.innerHTML = suitabilityHtml(r); out.hidden = false; }
     } catch (ex) { err.textContent = ex.message; err.hidden = false; out.hidden = true; }
     go.disabled = false; go.textContent = 'Check';
-  });
+  }));
   document.getElementById('langTop').addEventListener('click', openLanguage);
 
   document.getElementById('back').addEventListener('click', renderList);
@@ -873,6 +855,25 @@ function planetTableHtml(chart) {
 
 // ---------------------------------------------------------------- name, mobile number and company check
 const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
+// The Check tab shows one tile per kind, each with its own box, button and result.
+const SUIT_KINDS = [
+  ['name', 'Name check', (n) => `Does a name suit ${n}? Read by numerology and the birth chart, with spelling corrections.`, 'Name to check'],
+  ['mobile', 'Mobile number check', (n) => `Does a mobile number suit ${n}? Read by numerology and the birth chart.`, 'Mobile number to check'],
+  ['company', 'Company name check', (n) => `Does a company name suit ${n}? Add the date and place it was incorporated for a deeper reading; no time is needed.`, 'Company name to check'],
+];
+function suitTileHtml([kind, title, blurb, label], k) {
+  return `<div class="panel suit-tile" data-suit="${kind}">
+      <h2 style="margin:0 0 6px;">${title}</h2>
+      <p class="muted">${esc(blurb(k.name))}</p>
+      <form class="suit-form" data-kind="${kind}">
+        <input class="suit-val" type="text" maxlength="80" placeholder="${SUIT_HINT[kind]}" aria-label="${label}"${kind === 'mobile' ? ' inputmode="tel"' : ''} />
+        ${kind === 'company' ? '<input class="suit-date" type="date" aria-label="Date of incorporation" title="Date of incorporation" /><input class="suit-place" type="text" maxlength="80" placeholder="Place, e.g. Pune" aria-label="Place of incorporation" />' : ''}
+        <button class="btn-primary suit-go" type="submit">Check</button>
+      </form>
+      <p class="error suit-err" hidden></p>
+      <div class="suit-out msg msg--pandit" hidden></div>
+    </div>`;
+}
 const SUIT_AREAS = [['health', 'Health'], ['wealth', 'Wealth'], ['relations', 'Relations']];
 const suitLine = (areas, list = SUIT_AREAS) => list.map(([k, label]) => `${label}: <b>${esc(areas[k])}</b>`).join(' &middot; ');
 function suitabilityHtml(r) {
