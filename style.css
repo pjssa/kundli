@@ -1,50 +1,56 @@
-/* Standalone stylesheet for the public Kundli page (same brand tokens as
-   frontend/form/). Opened by people outside the company, so it depends on
-   nothing from the main SPA. Breakpoints follow the app: 900px / 600px. */
+/* Standalone stylesheet for the public Kundli page. Opened by people outside
+   the company, so it depends on nothing from the main SPA. Breakpoints follow
+   the app: 900px / 600px. Night sky theme: the same tokens are mirrored for the
+   in-app reading as .cm-night in frontend/assets/style.css, so change both together. */
 :root {
-  --bg: #F4F6F5; --surface: #FFFFFF; --ink: #171B1F; --ink-muted: #667079;
-  --border: rgba(23, 27, 31, 0.08); --border-strong: rgba(23, 27, 31, 0.16);
-  --accent: #1F5F5B; --accent-soft: #E4EFEE; --danger: #C23D3D; --danger-bg: #FBEAEA;
+  --bg: #0B0D1F; --surface: #151833; --ink: #EDEBFF; --ink-muted: #A6A3C4;
+  --border: rgba(243, 213, 138, 0.14); --border-strong: rgba(243, 213, 138, 0.30);
+  --accent: #E3B75C; --accent-ink: #F3D58A; --on-accent: #1A1530;
+  --accent-soft: rgba(227, 183, 92, 0.14); --danger: #FF8A8A; --danger-bg: rgba(255, 107, 107, 0.14);
+  --ok: #6FD39B; --bad: #FF8A8A;
   --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --radius-md: 12px; --radius-lg: 16px;
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --radius-md: 12px; --radius-lg: 18px;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
-/* Plain white page; the logo artwork lives only inside the chat. */
-body { margin: 0; font-family: var(--font-ui); background: #fff; color: var(--ink); }
-.wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 40px; }
+/* A fixed gradient behind the whole page, so short screens never show a flat edge. */
+body { margin: 0; font-family: var(--font-ui); color: var(--ink); background: #0B0D1F radial-gradient(circle at 20% 0%, #2a2560 0, #0B0D1F 55%) fixed; min-height: 100vh; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px calc(40px + env(safe-area-inset-bottom)); }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.top h1 { font-size: 22px; margin: 0; }
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; margin-top: 14px; }
-.panel h2 { font-size: 16px; margin: 0 0 10px; }
+.top h1 { font-size: 26px; margin: 0; font-family: var(--font-serif); font-weight: 600; color: var(--accent-ink); }
+.panel { background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; margin-top: 14px; }
+.panel h2 { font-size: 20px; margin: 0 0 10px; font-family: var(--font-serif); font-weight: 600; color: var(--accent-ink); }
 p.muted { color: var(--ink-muted); font-size: 14px; line-height: 1.5; margin: 6px 0; }
 p.error { color: var(--danger); background: var(--danger-bg); border-radius: var(--radius-md); padding: 10px 12px; font-size: 14px; }
 label { display: block; font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 4px; color: var(--ink-muted); }
-input, select, textarea { width: 100%; padding: 10px 12px; font-size: 16px; font-family: var(--font-ui); border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg); color: var(--ink); }
+input, select, textarea { width: 100%; padding: 10px 12px; font-size: 16px; font-family: var(--font-ui); border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.07); color: var(--ink); }
+input::placeholder, textarea::placeholder { color: var(--ink-muted); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 button { font-family: var(--font-ui); font-size: 15px; font-weight: 600; padding: 10px 16px; border-radius: var(--radius-md); border: 1px solid transparent; cursor: pointer; min-height: 40px; }
 button:disabled { opacity: 0.55; cursor: default; }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--border-strong); }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-secondary { background: rgba(255, 255, 255, 0.06); color: var(--ink); border-color: var(--border-strong); }
 .btn-danger { background: var(--surface); color: var(--danger); border-color: var(--danger); }
 .btn-small { font-size: 13px; padding: 6px 12px; min-height: 32px; }
 .btn-link { background: none; border: 0; color: var(--accent); padding: 4px 0; min-height: 0; font-weight: 500; }
 .signin { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 8px; text-align: center; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
-.tile { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 14px; cursor: pointer; }
+.tile { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 14px; cursor: pointer; }
 .tile:hover, .tile:focus-visible { border-color: var(--accent); outline: none; }
 .tile b { display: block; margin-bottom: 4px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
 /* The logo in its original colours, translucent: the picture and the area around it are one pre-blended surface, so no edge shows, wide or tall. */
-.thread { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; min-height: 120px; overflow-y: auto; padding: 12px 10px; border-radius: var(--radius-lg); background: #adaeb2 url('icons/chat-bg.png') center / contain no-repeat; }
-.thread > .hint { color: var(--ink); }
+.thread { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; min-height: 120px; overflow-y: auto; padding: 12px 10px; border-radius: var(--radius-lg); background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); }
+.thread > .hint { color: var(--ink-muted); }
 .msg { max-width: 85%; padding: 10px 14px; border-radius: var(--radius-lg); overflow-wrap: anywhere; }
 .msg p { margin: 0; line-height: 1.5; white-space: pre-line; }
 .msg p + p { margin-top: 8px; }
-.msg--me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.msg--me { align-self: flex-end; background: var(--accent); color: var(--on-accent); border-bottom-right-radius: 4px; }
 .msg--pandit { align-self: flex-start; background: var(--surface); border: 1px solid var(--border-strong); border-bottom-left-radius: 4px; }
-.msg h4 { margin: 22px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+.msg h4 { margin: 22px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-ink); }
 .msg .bt-note { color: var(--ink); font-weight: 400; }
 .msg h4.h--main { color: var(--ink); }
 .msg h4:first-child { margin-top: 0; }
@@ -57,7 +63,7 @@ button:disabled { opacity: 0.55; cursor: default; }
 .chart { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; background: var(--border-strong); border: 2px solid var(--border-strong); max-width: 420px; margin: 8px 0; }
 .chart .cell { background: var(--surface); min-height: 68px; padding: 4px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 .chart .cell small { display: block; font-weight: 400; color: var(--ink-muted); font-size: 11px; }
-.chart .cell.lagna { background: var(--accent-soft); }
+.chart .cell.lagna { background: #2b2748; }
 .chart .center { grid-column: 2 / 4; grid-row: 2 / 4; background: var(--surface); display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; color: var(--ink-muted); }
 .table-scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -96,7 +102,7 @@ body.locked { overflow: hidden; }
 
 .signout { display: inline-flex; align-items: center; gap: 8px; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex: none; }
-.avatar--initial { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
+.avatar--initial { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 600; }
 
 /* Desktop: use the whole screen instead of a narrow centred column. Phones and tablets keep the compact layout above. */
 @media (min-width: 1000px) {
@@ -151,8 +157,8 @@ body.locked { overflow: hidden; }
 .fu { margin: 12px 0 8px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-strong); }
 .fu p { margin: 0 0 8px; font-weight: 500; }
 .fu-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.fu-chip { border: 1px solid var(--border-strong); background: #fff; color: #1f2937; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; }
-.fu-chip:hover { border-color: var(--accent); background: #f3f4f6; }
+.fu-chip { border: 1px solid var(--border-strong); background: rgba(255, 255, 255, 0.06); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; }
+.fu-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
 
 /* Phone: a bigger question box on its own row, with Combine family above the full-width Send button. */
 @media (max-width: 600px) {
@@ -212,7 +218,7 @@ body.locked { overflow: hidden; }
 
 /* Live place-of-birth check */
 .place-status { margin: 4px 0 0; font-size: .9rem; }
-.place-status--ok { color: #1F7A4D; }
+.place-status--ok { color: var(--ok); }
 .place-status--bad { color: var(--danger, #C23D3D); }
 .place-status--check { color: var(--ink, inherit); }
 .place-status--wait { opacity: .7; }
@@ -225,6 +231,14 @@ body.locked { overflow: hidden; }
 .msg .muh-day ul { margin: 4px 0; padding-left: 18px; }
 .msg .muh-why { font-size: 0.85em; opacity: 0.75; }
 .msg .muh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; list-style: none; padding: 0; margin: 4px 0; font-size: 0.85em; }
-.msg .muh-best, .msg .muh-good { color: #1a7f37; }
-.msg .muh-bad { color: #b42318; }
+.msg .muh-best, .msg .muh-good { color: var(--ok); }
+.msg .muh-bad { color: var(--bad); }
 @media (max-width: 600px) { .msg .muh-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* Night sky, phone polish: thumb-sized targets, a composer that stays in reach, and room for the home indicator. */
+@media (pointer: coarse) { button, .btn-small { min-height: 44px; } .btn-link { min-height: 0; } }
+@media (max-width: 600px) {
+  .composer { position: sticky; bottom: 0; z-index: 5; margin: 10px -18px -18px; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(to top, #0B0D1F 70%, rgba(11, 13, 31, 0)); }
+  .chat.full .composer { margin: 10px -16px 0; }
+  .msg { font-size: 15px; }
+}
