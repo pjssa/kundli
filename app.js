@@ -260,6 +260,27 @@ async function wireNotifyPanel() {
   draw();
 }
 
+// Asked once each time the app is opened until a chart is marked as the person's own; "Not now" only silences it for this visit.
+let askedMine = false;
+function askWhichIsMine(items) {
+  if (askedMine || !items.length || items.some((k) => k.isMine)) return;
+  askedMine = true;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
+  overlay.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin-top:24px;"><h2>Which one is you?</h2>
+    <form id="mineForm"><p class="muted">Mark your own chart: your daily 7 am forecast is based on it.</p>
+      ${items.map((k, i) => `<label class="tu" style="display:block;margin:6px 0;"><input type="radio" name="mine" value="${esc(k.kundliId)}" ${i === 0 ? 'checked' : ''} style="width:auto;" /> ${esc(k.name)}</label>`).join('')}
+      <p class="error" id="mineErr" hidden></p>
+      <div class="actions"><button type="button" class="btn-secondary" id="mineLater">Not now</button><button type="submit" class="btn-primary">This is me</button></div></form></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#mineLater').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#mineForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try { await call('kundliPublic_setMine', { kundliId: new FormData(e.target).get('mine'), mine: true }); overlay.remove(); renderList(); }
+    catch (err) { const el = overlay.querySelector('#mineErr'); el.textContent = err.message; el.hidden = false; }
+  });
+}
+
 async function renderList() {
   peopleCache = null;
   if (!getSession() && !currentToken()) return showSignIn();
@@ -286,6 +307,7 @@ async function renderList() {
   onLangChange = null;
   wireFooter();
   wireNotifyPanel();
+  askWhichIsMine(items);
   document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
   app.querySelectorAll('[data-open]').forEach((el) => {
     const go = () => renderDetail(el.dataset.open);
