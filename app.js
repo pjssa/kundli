@@ -192,6 +192,74 @@ function avatarHtml(w) {
     : `<span class="avatar avatar--initial" aria-hidden="true">${esc(initialOf(w))}</span>`;
 }
 
+
+// ---------------------------------------------------------------- daily 7am notifications
+
+const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// iPhone and iPad only deliver web push to an app added to the Home Screen; every other browser can subscribe in the page itself.
+function pushSupport() {
+  if (!window.isSecureContext) return { ok: false, reason: 'Notifications need a secure (https) connection.' };
+  if (isIos() && !isStandalone()) return { ok: false, reason: 'On iPhone and iPad, first tap Share, then "Add to Home Screen", and open Cosmic Math from the Home Screen. Notifications can be turned on there.' };
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return { ok: false, reason: 'This browser does not support notifications. Try Chrome, Edge, Firefox or Safari, or add Cosmic Math to your Home Screen.' };
+  return { ok: true };
+}
+function keyToBytes(b64) {
+  const raw = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+async function pushRegistration() { return navigator.serviceWorker.ready; }
+async function pushState() {
+  const sup = pushSupport();
+  if (!sup.ok) return { supported: false, reason: sup.reason, subscribed: false };
+  const sub = await (await pushRegistration()).pushManager.getSubscription();
+  return { supported: true, subscribed: !!sub && Notification.permission === 'granted', blocked: Notification.permission === 'denied' };
+}
+// Must run from a tap: browsers only show the permission prompt for a user gesture.
+async function enablePush() {
+  const sup = pushSupport();
+  if (!sup.ok) throw new Error(sup.reason);
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications are blocked for this site. Allow them in your browser or phone settings, then try again.' : 'Permission was not given.');
+  const { publicKey } = await call('kundliPublic_pushConfig');
+  const reg = await pushRegistration();
+  const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(publicKey) });
+  await call('kundliPublic_pushSubscribe', { subscription: sub.toJSON(), userAgent: navigator.userAgent });
+}
+async function disablePush() {
+  const sub = await (await pushRegistration()).pushManager.getSubscription();
+  if (!sub) return;
+  try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
+}
+
+function notifyPanelHtml(hasMine) {
+  return `<div class="panel" id="notifyPanel"><h2 style="margin:0 0 6px;">Daily forecast at 7 am</h2>
+    <p class="muted">Every morning: how your day looks, and the next favourable or challenging change with its date. ${hasMine ? '' : 'First tick &ldquo;This is my own chart&rdquo; on your own entry (Edit).'}</p>
+    <p class="muted" id="notifyStatus">Checking&hellip;</p><p class="error" id="notifyErr" hidden></p>
+    <div class="actions"><button class="btn-primary btn-small" id="notifyToggle" hidden></button><button class="btn-secondary btn-small" id="notifyTest" hidden>Send me today&rsquo;s now</button></div></div>`;
+}
+async function wireNotifyPanel() {
+  const status = document.getElementById('notifyStatus'), btn = document.getElementById('notifyToggle'), test = document.getElementById('notifyTest'), err = document.getElementById('notifyErr');
+  if (!status) return;
+  const show = (m) => { err.hidden = !m; err.textContent = m || ''; };
+  const draw = async () => {
+    const st = await pushState().catch(() => ({ supported: false, reason: 'Could not check notifications on this device.', subscribed: false }));
+    if (!st.supported) { status.textContent = st.reason; btn.hidden = true; test.hidden = true; return; }
+    status.textContent = st.subscribed ? 'On for this device.' : st.blocked ? 'Blocked in your browser settings for this site.' : 'Off for this device.';
+    btn.hidden = false; btn.textContent = st.subscribed ? 'Turn off' : 'Turn on'; test.hidden = !st.subscribed;
+    btn.onclick = async () => {
+      show(''); btn.disabled = true;
+      try { if (st.subscribed) await disablePush(); else await enablePush(); } catch (e) { show(e.message); }
+      btn.disabled = false; draw();
+    };
+    test.onclick = async () => {
+      show(''); test.disabled = true;
+      try { await call('kundliPublic_pushTest'); } catch (e) { show(e.message); }
+      test.disabled = false;
+    };
+  };
+  draw();
+}
+
 async function renderList() {
   peopleCache = null;
   if (!getSession() && !currentToken()) return showSignIn();
@@ -207,8 +275,9 @@ async function renderList() {
     <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>
     <p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
-    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
+    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
+    ${notifyPanelHtml(items.some((k) => k.isMine))}
     ${footerHtml()}
   </div>`;
   document.getElementById('signOut').addEventListener('click', signOut);
@@ -216,6 +285,7 @@ async function renderList() {
   document.querySelector('#signOut img.avatar')?.addEventListener('error', (e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar avatar--initial', textContent: initialOf(who) })); });
   onLangChange = null;
   wireFooter();
+  wireNotifyPanel();
   document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
   app.querySelectorAll('[data-open]').forEach((el) => {
     const go = () => renderDetail(el.dataset.open);
@@ -876,6 +946,7 @@ function openModal(k, done) {
       <div id="placeStatus" class="place-status" aria-live="polite"></div>
       <p class="muted" id="timeHint">${k?.timeUnknown ? 'We will help you find the birth time from life events.' : 'The exact birth time matters: the ascendant changes about every two hours.'}</p>
       <label>Gender (optional)<select name="gender">${['', 'Male', 'Female', 'Other'].map((g) => `<option value="${g}" ${k?.gender === g ? 'selected' : ''}>${g || 'Prefer not to say'}</option>`).join('')}</select></label>
+      <label class="tu" style="display:block;margin:8px 0;"><input type="checkbox" name="isMine" ${k?.isMine ? 'checked' : ''} style="width:auto;" /> This is my own chart (the 7 am daily forecast is about it)</label>
       <p class="error" id="ferr" hidden></p>
       <div class="actions"><button type="button" class="btn-secondary" id="cancel">Cancel</button><button type="submit" class="btn-primary">${isEdit ? 'Save changes' : 'Create'}</button></div>
     </form></div>`;
@@ -901,6 +972,8 @@ function openModal(k, done) {
       // Coordinates and time zone are worked out server-side from the place.
       const out = await guarded(() => call('kundliPublic_save', { kundliId: k?.kundliId, name: fd.get('name'), gender: fd.get('gender'), birthDate: fd.get('birthDate'), birthTime: fd.get('birthTime'), timeUnknown: fd.get('timeUnknown') === 'on', place: fd.get('place') }));
       if (!out) { close(); return; }
+      const mine = fd.get('isMine') === 'on';
+      if (mine !== !!k?.isMine) await call('kundliPublic_setMine', { kundliId: out.kundliId, mine });
       close();
       // A new kundli without a birth time goes straight to finding it; an edit only does when no time has been settled yet.
       if (fd.get('timeUnknown') === 'on' && (!isEdit || k?.rectification?.status !== 'applied')) { openRectify(out.kundliId); return; }
