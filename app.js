@@ -232,11 +232,12 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
+// Two rows: the title with its on/off button, then one line of text with the test button when it is on.
 function notifyPanelHtml(hasMine) {
-  return `<div class="panel" id="notifyPanel"><h2 style="margin:0 0 6px;">Daily forecast at 7 am</h2>
-    <p class="muted">Every morning: how your day looks, and the next favourable or challenging change with its date. ${hasMine ? '' : 'First tick &ldquo;This is my own chart&rdquo; on your own entry (Edit).'}</p>
-    <p class="muted" id="notifyStatus">Checking&hellip;</p><p class="error" id="notifyErr" hidden></p>
-    <div class="actions"><button class="btn-primary btn-small" id="notifyToggle" hidden></button><button class="btn-secondary btn-small" id="notifyTest" hidden>Send me today&rsquo;s now</button></div></div>`;
+  return `<div class="panel notify" id="notifyPanel">
+    <div class="notify-row"><h2>Daily forecast at 7 am</h2><button class="btn-primary btn-small" id="notifyToggle" hidden></button></div>
+    <div class="notify-row notify-row--text"><p class="muted">${hasMine ? 'Your day ahead and next change.' : 'First tick &ldquo;This is me&rdquo; on your own chart.'} <span id="notifyStatus">Checking&hellip;</span></p><button class="btn-secondary btn-small" id="notifyTest" hidden>Send now</button></div>
+    <p class="error" id="notifyErr" hidden></p></div>`;
 }
 async function wireNotifyPanel() {
   const status = document.getElementById('notifyStatus'), btn = document.getElementById('notifyToggle'), test = document.getElementById('notifyTest'), err = document.getElementById('notifyErr');
@@ -245,7 +246,7 @@ async function wireNotifyPanel() {
   const draw = async () => {
     const st = await pushState().catch(() => ({ supported: false, reason: 'Could not check notifications on this device.', subscribed: false }));
     if (!st.supported) { status.textContent = st.reason; btn.hidden = true; test.hidden = true; return; }
-    status.textContent = st.subscribed ? 'On for this device.' : st.blocked ? 'Blocked in your browser settings for this site.' : 'Off for this device.';
+    status.textContent = st.subscribed ? 'On.' : st.blocked ? 'Blocked in settings.' : 'Off.';
     btn.hidden = false; btn.textContent = st.subscribed ? 'Turn off' : 'Turn on'; test.hidden = !st.subscribed;
     btn.onclick = async () => {
       show(''); btn.disabled = true;
@@ -328,13 +329,12 @@ async function renderList() {
   const me = data.me || {};
   const who = { email: me.email || prof.email || '', name: me.name || prof.name || '', picture: prof.email && me.email && prof.email !== me.email ? '' : (prof.picture || '') };
   app.innerHTML = `<div class="wrap wrap--tabs">
-    <div class="top"><h1>Cosmic Math</h1>${pickMode ? '' : `<button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button>`}</div>
+    <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
-    ${pickMode ? '' : '<div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>'}
-    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}<span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;margin-top:8px;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label></div>`).join('')}</div>`
+    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
     ${pickMode ? '' : notifyPanelHtml(items.some((k) => k.isMine))}
-    ${pickMode ? '' : footerHtml()}
+    ${pickMode ? '' : '<div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a person</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div>'}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
