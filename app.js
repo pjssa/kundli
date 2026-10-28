@@ -331,7 +331,7 @@ async function renderList() {
   app.innerHTML = `<div class="wrap wrap--tabs${pickMode ? '' : ' wrap--home'}">
     <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
-    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
+    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
     ${pickMode ? '' : notifyPanelHtml(items.some((k) => k.isMine))}
     ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a person</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
@@ -381,6 +381,16 @@ async function renderList() {
       btn.disabled = true;
       try { await guarded(() => call('kundliPublic_delete', { kundliId: k.kundliId })); if (selectedId === k.kundliId) chooseId(''); renderList(); } catch (err) { alert(err.message); btn.disabled = false; }
     });
+  });
+  // Tapping a tile on Home makes that person the one Ask, Check and Chart work on; it does not leave Home.
+  app.querySelectorAll('[data-select]').forEach((el) => {
+    const pick = (e) => {
+      if (e.target.closest('button, label, input, a')) return;
+      chooseId(el.dataset.select);
+      app.querySelectorAll('[data-select]').forEach((t) => { const on = t === el; t.classList.toggle('tile--selected', on); t.setAttribute('aria-pressed', String(on)); });
+    };
+    el.addEventListener('click', pick);
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { pick(e); e.preventDefault(); } });
   });
   app.querySelectorAll('[data-open]').forEach((el) => {
     // Picking a person carries on to the tab that was tapped, or the one used last.
@@ -500,9 +510,11 @@ async function renderDetail(kundliId) {
     const err = tile.querySelector('.suit-err'), out = tile.querySelector('.suit-out'), go = form.querySelector('.suit-go');
     err.hidden = true;
     if (!val) { err.textContent = 'Please type what to check.'; err.hidden = false; return; }
+    const inc = kind === 'company' ? isoFromDmy(form.querySelector('.suit-date').value) : '';
+    if (inc === null) { err.textContent = 'Please type the date of incorporation as dd/mm/yyyy.'; err.hidden = false; return; }
     go.disabled = true; go.textContent = 'Checking\u2026';
     try {
-      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind, value: val, ...(kind === 'company' ? { incorporationDate: form.querySelector('.suit-date').value || undefined, incorporationPlace: form.querySelector('.suit-place').value.trim() || undefined } : {}) }));
+      const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind, value: val, ...(kind === 'company' ? { incorporationDate: inc || undefined, incorporationPlace: form.querySelector('.suit-place').value.trim() || undefined } : {}) }));
       if (r) { out.innerHTML = suitabilityHtml(r); out.hidden = false; }
     } catch (ex) { err.textContent = ex.message; err.hidden = false; out.hidden = true; }
     go.disabled = false; go.textContent = 'Check';
@@ -836,9 +848,45 @@ function gemstoneHtml(a, L) {
   return `<h4 class="h--main">${esc(lab('gemstone'))}</h4>${a.gemstone ? `<p>${esc(a.gemstone)}</p>` : ''}<p class="muted">${esc(lab('gemStarsNote'))}</p>${gems.map((g) => `<div class="gem"><h5 class="gem-title">${g.priority ? `${esc(lab('gemPriority'))} ${g.priority} · ` : ''}${esc(g.stone || '')}${g.advice === 'caution' ? ' ⚠' : ''} <span title="${g.stars || ''}/5">${g.stars ? gemStars(g.stars) : ''}</span></h5><dl class="gem-rows">${gemExtrasHtml(g, L)}${GEM_ROWS.map(([lk, f]) => (g[f] ? `<dt>${esc(lab(lk))}</dt><dd>${esc(g[f])}</dd>` : '')).join('')}</dl></div>`).join('')}${a.gemstoneAvoid ? `<p class="gem-avoid"><b>${esc(lab('gemAvoid'))}:</b> ${esc(a.gemstoneAvoid)}</p>` : ''}`;
 }
 
+// The model sometimes returns the two characters "" for an empty field; that is text to the page, so it is blanked before it is shown (also for chats saved earlier).
+function unquoteBlank(ans) {
+  const out = { ...ans };
+  for (const k of ['started', 'timing', 'next', 'remedy', 'basis', 'gemstone']) if (typeof out[k] === 'string' && /^[\s"'`\u201c\u201d\u2018\u2019]*$/.test(out[k])) out[k] = '';
+  return out;
+}
+
+// Android shows a round clock dial for time boxes and each phone's region decides the date order, so dates and times are typed with
+// the slashes and colon added as you go: dd/mm/yyyy and a 24-hour hh:mm. Values still travel as ISO dates and HH:MM.
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement)) return;
+  if (t.matches('[data-dmy]')) {
+    const d = t.value.replace(/\D/g, '').slice(0, 8);
+    t.value = d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+  } else if (t.matches('[data-hm]')) {
+    const d = t.value.replace(/\D/g, '').slice(0, 4);
+    t.value = d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d;
+  }
+});
+const dmyFromIso = (iso) => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+// '' when empty, HH:MM when valid, null when it is not a real time.
+const hmFromText = (v) => { const t = String(v || '').trim(); if (!t) return ''; const m = t.match(/^(\d{2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? t : null; };
+const DMY_ATTRS = 'type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" autocomplete="off" data-dmy';
+const HM_ATTRS = 'type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm" autocomplete="off" data-hm';
+
+// '' when empty, the ISO date when valid, null when it is not a real date.
+function isoFromDmy(v) {
+  const t = String(v || '').trim();
+  if (!t) return '';
+  const m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const dt = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1]));
+  return dt.getUTCFullYear() === +m[3] && dt.getUTCMonth() === +m[2] - 1 && dt.getUTCDate() === +m[1] ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
 function answerHtml(e) {
   const L = (e.lang && labelCache.get(e.lang)) || L_EN;
-  const a = e.answer || {};
+  const a = unquoteBlank(e.answer || {});
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
     <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
@@ -875,7 +923,7 @@ function suitTileHtml([kind, title, blurb, label], k) {
       <p class="muted">${esc(blurb(k.name))}</p>
       <form class="suit-form" data-kind="${kind}">
         <input class="suit-val" type="text" maxlength="80" placeholder="${SUIT_HINT[kind]}" aria-label="${label}"${kind === 'mobile' ? ' inputmode="tel"' : ''} />
-        ${kind === 'company' ? '<input class="suit-date" type="date" aria-label="Date of incorporation" title="Date of incorporation" /><input class="suit-place" type="text" maxlength="80" placeholder="Place, e.g. Pune" aria-label="Place of incorporation" />' : ''}
+        ${kind === 'company' ? '<label class="suit-field">Date of incorporation (optional)<input class="suit-date" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" autocomplete="off" data-dmy /></label><label class="suit-field">Place of incorporation (optional)<input class="suit-place" type="text" maxlength="80" placeholder="e.g. Pune" /></label>' : ''}
         <button class="btn-primary suit-go" type="submit">Check</button>
       </form>
       <p class="error suit-err" hidden></p>
@@ -1005,7 +1053,7 @@ function rectResultsHtml(r) {
   return `<p class="rect-conf rect-conf--${esc(r.confidence)}"><b>${esc(CONF_TEXT[r.confidence] || '')}.</b> These are the likely rising-sign windows. A remembered date is rarely exact, so treat the result as an estimate.</p>
     ${r.windows.map((w, i) => `<div class="gem"><h5 class="gem-title">${i === 0 ? 'Most likely: ' : ''}${esc(w.lagna)} rising &middot; ${esc(w.from)} to ${esc(w.to)} &middot; ${w.matchPercent}% fit</h5>
       ${w.events ? `<ul class="rect-events">${w.events.map((e) => `<li>${esc(e.label)} (${esc(e.date)}): ${esc(e.maha)} / ${esc(e.antar)} period, <b>${esc(e.fit)}</b> fit</li>`).join('')}</ul>` : ''}
-      <div class="rect-use"><input type="time" value="${esc(w.suggested)}" data-rect-time="${i}" aria-label="Birth time inside this window" /><button type="button" class="btn-primary btn-small" data-rect-use="${i}">${applied && r.appliedTime >= w.from && r.appliedTime <= w.to ? 'Using this time' : 'Use this time'}</button></div></div>`).join('')}`;
+      <div class="rect-use"><input ${HM_ATTRS} value="${esc(w.suggested)}" data-rect-time="${i}" aria-label="Birth time inside this window" /><button type="button" class="btn-primary btn-small" data-rect-use="${i}">${applied && r.appliedTime >= w.from && r.appliedTime <= w.to ? 'Using this time' : 'Use this time'}</button></div></div>`).join('')}`;
 }
 
 async function openRectify(kundliId) {
@@ -1013,7 +1061,7 @@ async function openRectify(kundliId) {
   try { const out = await guarded(() => call('kundliPublic_get', { kundliId })); if (!out) return; k = out.kundli; } catch (err) { window.alert(err.message); return; }
   const r0 = k.rectification;
   const kinds = k.rectifyKinds || [];
-  const eventRow = (e = {}) => `<div class="rect-row"><select class="rect-kind" aria-label="Type of event"><option value="">Type of event</option>${kinds.map((x) => `<option value="${esc(x.kind)}" ${e.kind === x.kind ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select><input type="date" class="rect-date" aria-label="Date of the event" value="${esc(e.date || '')}" /><button type="button" class="btn-secondary btn-small rect-rm" aria-label="Remove this event">&times;</button></div>`;
+  const eventRow = (e = {}) => `<div class="rect-row"><select class="rect-kind" aria-label="Type of event"><option value="">Type of event</option>${kinds.map((x) => `<option value="${esc(x.kind)}" ${e.kind === x.kind ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select><input ${DMY_ATTRS} class="rect-date" aria-label="Date of the event" value="${dmyFromIso(e.date)}" /><button type="button" class="btn-secondary btn-small rect-rm" aria-label="Remove this event">&times;</button></div>`;
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
   overlay.innerHTML = `
@@ -1047,7 +1095,8 @@ async function openRectify(kundliId) {
   let current = r0;
   overlay.querySelector('#rectGo').addEventListener('click', async (e) => {
     err.hidden = true;
-    const events = [...rows.children].map((row) => ({ kind: row.querySelector('.rect-kind').value, date: row.querySelector('.rect-date').value })).filter((x) => x.kind || x.date);
+    const events = [...rows.children].map((row) => ({ kind: row.querySelector('.rect-kind').value, date: isoFromDmy(row.querySelector('.rect-date').value) })).filter((x) => x.kind || x.date);
+    if (events.some((x) => x.date === null)) { err.textContent = 'Please type each event date as dd/mm/yyyy.'; err.hidden = false; return; }
     const [from, to] = (overlay.querySelector('#rectWindow').value || '').split('-');
     e.target.disabled = true; e.target.textContent = 'Testing every possible time…';
     try {
@@ -1061,7 +1110,8 @@ async function openRectify(kundliId) {
   overlay.querySelector('#rectResults').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-rect-use]');
     if (!b || !current) return;
-    const time = overlay.querySelector(`[data-rect-time="${b.dataset.rectUse}"]`).value;
+    const time = hmFromText(overlay.querySelector(`[data-rect-time="${b.dataset.rectUse}"]`).value);
+    if (!time) { err.textContent = 'Please type the birth time as hh:mm, 24-hour.'; err.hidden = false; return; }
     b.disabled = true; b.textContent = 'Saving…';
     try { const done = await guarded(() => call('kundliPublic_rectifyApply', { kundliId, time })); if (!done) { close(); return; } finish(); } catch (ex) { err.textContent = ex.message; err.hidden = false; b.disabled = false; b.textContent = 'Use this time'; }
   });
@@ -1110,9 +1160,9 @@ function openModal(k, done) {
     <form id="f">
       <label>Name <input type="text" name="name" required value="${esc(k?.name || '')}" /></label>
       <div class="row">
-        <label>Date of birth <input type="date" name="birthDate" required value="${esc(k?.birthDate?.slice(0, 10) || '')}" /></label>
+        <label>Date of birth <input ${DMY_ATTRS} name="birthDate" required value="${dmyFromIso(k?.birthDate)}" /></label>
         <div>
-          <label>Time of birth <input type="time" name="birthTime" ${k?.timeUnknown ? 'disabled' : 'required'} value="${esc(k?.timeUnknown ? '' : k?.birthTime || '')}" /></label>
+          <label>Time of birth <input ${HM_ATTRS} name="birthTime" ${k?.timeUnknown ? 'disabled' : 'required'} value="${esc(k?.timeUnknown ? '' : k?.birthTime || '')}" /></label>
           <label class="tu"><input type="checkbox" name="timeUnknown" ${k?.timeUnknown ? 'checked' : ''} style="width:auto;" /> (time not known)</label>
         </div>
       </div>
@@ -1139,11 +1189,14 @@ function openModal(k, done) {
     const fd = new FormData(e.target);
     const errEl = overlay.querySelector('#ferr');
     errEl.hidden = true;
+    const birthIso = isoFromDmy(fd.get('birthDate')), birthHm = hmFromText(fd.get('birthTime'));
+    if (!birthIso) { errEl.textContent = 'Please type the date of birth as dd/mm/yyyy.'; errEl.hidden = false; return; }
+    if (birthHm === null || (!birthHm && fd.get('timeUnknown') !== 'on')) { errEl.textContent = 'Please type the time of birth as hh:mm, 24-hour, or tick "time not known".'; errEl.hidden = false; return; }
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; btn.textContent = 'Finding place…';
     try {
       // Coordinates and time zone are worked out server-side from the place.
-      const out = await guarded(() => call('kundliPublic_save', { kundliId: k?.kundliId, name: fd.get('name'), gender: fd.get('gender'), birthDate: fd.get('birthDate'), birthTime: fd.get('birthTime'), timeUnknown: fd.get('timeUnknown') === 'on', place: fd.get('place') }));
+      const out = await guarded(() => call('kundliPublic_save', { kundliId: k?.kundliId, name: fd.get('name'), gender: fd.get('gender'), birthDate: birthIso, birthTime: birthHm, timeUnknown: fd.get('timeUnknown') === 'on', place: fd.get('place') }));
       if (!out) { close(); return; }
       close();
       // A new kundli without a birth time goes straight to finding it; an edit only does when no time has been settled yet.

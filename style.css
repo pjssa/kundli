@@ -38,7 +38,8 @@ button:disabled { opacity: 0.55; cursor: default; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
 .tile { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 14px; }
-.tile--pick { cursor: pointer; }
+.tile--pick, .tile[data-select] { cursor: pointer; }
+.tile--selected { border-color: var(--accent); background: var(--accent-soft); }
 .tile:hover, .tile:focus-visible { border-color: var(--accent); outline: none; }
 .tile b { display: block; margin-bottom: 4px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -329,3 +330,7 @@ body.locked { overflow: hidden; }
   .wrap--home .notify { margin-top: auto; }
   .wrap--home .tiles, .wrap--home > .panel:not(.notify) { margin-bottom: 14px; }
 }
+/* A date box is blank on phones, so its label is written above it instead of living in a tooltip. */
+.suit-field { flex: 1 1 180px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; opacity: .85; }
+.suit-field input { flex: none; width: 100%; }
+.suit-form .suit-go { align-self: flex-end; }
