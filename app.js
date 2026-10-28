@@ -312,7 +312,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
 async function renderList() {
   peopleCache = null;
   detailId = '';
-  document.body.classList.remove('locked');
+  document.body.classList.remove('locked', 'typing');
   if (!getSession() && !currentToken()) return showSignIn();
   app.innerHTML = `<div class="wrap"><p class="muted">Loading&hellip;</p></div>`;
   let data;
@@ -384,6 +384,17 @@ async function renderList() {
 
 // ---------------------------------------------------------------- person + chat
 
+// How much of the bottom of the screen the on-screen keyboard covers, as a CSS variable, so the full-screen chat always ends at the keyboard
+// (a pinch-zoom is ignored). Where the browser already shrinks the page for the keyboard this stays 0.
+if (window.visualViewport) {
+  const syncKeyboard = () => {
+    const vv = window.visualViewport;
+    document.documentElement.style.setProperty('--kb', (vv.scale > 1.01 ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))) + 'px');
+  };
+  window.visualViewport.addEventListener('resize', syncKeyboard);
+  window.visualViewport.addEventListener('scroll', syncKeyboard);
+}
+
 // Bottom tab bar on every screen (phones and tablets). Ask, Check and Chart work on one person, so tapping one asks
 // who first unless a person is already chosen; Home is the list of everyone, and the screen the app opens on. On wide screens the bar is hidden and the
 // page shows everything, as before. Mirrors KundliReading.js.
@@ -448,14 +459,13 @@ async function renderDetail(kundliId) {
 
     <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
+      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small chat-change" id="chatChange">Change</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
       <form class="composer" id="askForm">
         <textarea id="q" rows="1" placeholder="Ask anything, e.g. Will I get a promotion this year?"></textarea>
         <div class="send-col">
-          <label class="combine-tick" title="Combine family members&rsquo; kundlis for this question"><input type="checkbox" id="combineTick" /> Combine family</label>
           <button class="btn-primary" id="send" type="submit">Send</button>
         </div>
       </form>
@@ -510,7 +520,7 @@ async function renderDetail(kundliId) {
   document.getElementById('langTop').addEventListener('click', openLanguage);
 
   document.getElementById('back').addEventListener('click', renderList);
-  document.getElementById('changePerson').addEventListener('click', () => { pickTab = detailTab; renderList(); });
+  for (const id of ['changePerson', 'chatChange']) document.getElementById(id)?.addEventListener('click', () => { pickTab = detailTab; renderList(); });
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
   document.getElementById('rectifyBtn')?.addEventListener('click', () => openRectify(k.kundliId));
   document.getElementById('del').addEventListener('click', async (e) => {
@@ -525,6 +535,12 @@ async function renderDetail(kundliId) {
   // A one-line box on a phone cannot hold the long example.
   if (window.matchMedia('(max-width: 899px)').matches) qBox.placeholder = 'Ask anything\u2026';
   const sendBtn = document.getElementById('send');
+  // While typing on a phone the keyboard owns the bottom of the screen: the tab bar steps aside and only the message box stays above the keyboard.
+  const setTyping = (on) => document.body.classList.toggle('typing', on && window.matchMedia('(max-width: 899px)').matches);
+  qBox.addEventListener('focus', () => setTyping(true));
+  qBox.addEventListener('blur', () => setTyping(false));
+  // Tapping Send keeps the keyboard open, like a messaging app, so the layout does not jump under the finger.
+  sendBtn.addEventListener('pointerdown', (e) => { if (document.activeElement === qBox) e.preventDefault(); });
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
   const toBottom = () => {
@@ -634,7 +650,6 @@ async function renderDetail(kundliId) {
     // Touch keyboards keep Enter as a new line; the Send button sends.
     if (e.key === 'Enter' && !e.shiftKey && !window.matchMedia('(pointer: coarse)').matches) { e.preventDefault(); document.getElementById('askForm').requestSubmit(); }
   });
-  const combineTick = document.getElementById('combineTick');
   // Picker bubble: tick whose kundlis to read together, or answer for this person alone.
   const showPicker = (question, people) => {
     const box = document.createElement('div');
@@ -685,9 +700,10 @@ async function renderDetail(kundliId) {
     qBox.value = ''; grow(); landOnAnswer = false; toBottom();
     const dropPending = () => thread.querySelectorAll('.pending, .typing').forEach((n) => n.remove());
     try {
-      if (combineTick.checked || COMBINE_RE.test(question)) {
+      if (COMBINE_RE.test(question) || COMBINE_MATTER_RE.test(question)) {
         const people = await guarded(loadPeople);
-        if (people) {
+        // A house or partnership question with only one chart saved has nobody to combine with, so it is just answered; explicit family wording still explains how to add people.
+        if (people && (people.length > 1 || COMBINE_RE.test(question))) {
           thread.querySelector('.typing')?.remove();
           showPicker(question, people);
           return;
@@ -705,7 +721,6 @@ async function renderDetail(kundliId) {
       errEl.textContent = err.message; errEl.hidden = false;
       syncBar();
     } finally {
-      combineTick.checked = false;
       // The picker keeps the send button locked until a choice is made.
       if (!thread.querySelector('.picker')) sendBtn.disabled = false;
       toBottom();
@@ -716,6 +731,9 @@ async function renderDetail(kundliId) {
 // A question about the family as a whole offers a picker of whose kundlis to read
 // together; the server only ever sees the ids the person ticked.
 const COMBINE_RE = /\b(family|families|household|together|combined?|joint(ly)?|all of us|each of us|everyone|me and my|my (wife|husband|spouse|partner|parents|mother|father|children|kids|son|daughter|brother|sister)s?\s+(and|&)|all (of )?(my|the) (family|members))\b/i;
+// Matters that really need the family charts read together: a house or property, a residence, a partnership or a new venture. Asking one
+// offers the "whose kundlis" choice, which can always be skipped with "Just <name>". Other family wording is in COMBINE_RE above.
+const COMBINE_MATTER_RE = /\b(houses?|propert(y|ies)|residen(ce|tial)|real estate|flats?|apartments?|plots?|villas?|bungalows?|new (home|house)|(buy|buying|purchase|purchasing|construct|constructing|build|building|shift|shifting|move|moving|rent|renting|sell|selling) (a |an |the |my |our )?(home|land)|partnerships?|business partners?|new venture|joint venture|(start|starting|open|opening|launch|launching) (a |an |our |my )?(new )?(business|venture|company|firm|startup|shop)|co-?found(er|ers)?)\b/i;
 let peopleCache = null;
 async function loadPeople() {
   if (!peopleCache) peopleCache = (await call('kundliPublic_list')).items.map((p) => ({ kundliId: p.kundliId, name: p.name }));

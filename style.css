@@ -278,7 +278,7 @@ body.locked { overflow: hidden; }
 @media (max-width: 899px) {
   .chat-title-wide, #langTop, #full { display: none; }
   .chat-title-name { display: inline; }
-  .wrap--tabs .chat.full { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); height: auto; background: #0B0D1F radial-gradient(circle at 20% 0%, #2a2560 0, #0B0D1F 60%); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 10px 12px 0; }
+  .wrap--tabs .chat.full { bottom: calc(var(--kb, 0px) + var(--tabbar-h) + env(safe-area-inset-bottom)); height: auto; background: #0B0D1F radial-gradient(circle at 20% 0%, #2a2560 0, #0B0D1F 60%); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 10px 12px 0; }
   .wrap--tabs .chat.full > .top { margin: 0 0 6px; }
   .wrap--tabs .chat.full > .top h2 { font-size: 24px; }
   .wrap--tabs .chat.full .thread { background: none; border: 0; padding: 4px 0; }
@@ -287,4 +287,14 @@ body.locked { overflow: hidden; }
   .wrap--tabs .chat.full .send-col { display: contents; }
   .wrap--tabs .chat.full .send-col #send { order: 2; width: auto; flex: none; min-height: 44px; padding: 0 20px; border-radius: 22px; }
   .wrap--tabs .chat.full .combine-tick { order: 3; flex: 1 0 100%; font-size: 12px; opacity: .8; }
+}
+
+/* Change (pick another person) sits in the Ask header on phones and tablets only. */
+.chat-change { display: none; }
+@media (max-width: 899px) { .chat.full .chat-change { display: inline-flex; align-items: center; } }
+
+/* While typing the tab bar hides behind the keyboard and the chat ends right at it, so only the message box shows. */
+@media (max-width: 899px) {
+  body.typing .tabbar { display: none; }
+  body.typing .wrap--tabs .chat.full { bottom: var(--kb, 0px); }
 }
