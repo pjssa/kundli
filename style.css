@@ -37,7 +37,8 @@ button:disabled { opacity: 0.55; cursor: default; }
 .signin { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 8px; text-align: center; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
-.tile { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 14px; cursor: pointer; }
+.tile { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 14px; }
+.tile--pick { cursor: pointer; }
 .tile:hover, .tile:focus-visible { border-color: var(--accent); outline: none; }
 .tile b { display: block; margin-bottom: 4px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -317,3 +318,14 @@ body.locked { overflow: hidden; }
 .notify-row--text { margin-top: 4px; }
 .notify .error { margin: 6px 0 0; }
 @media (max-width: 600px) { .top--home h1 { font-size: 22px; } .top--home .btn-small { padding: 6px 10px; } }
+
+/* Home on phones and tablets: the Add a person / Feedback row stays at the bottom, above the tab bar, while the people and the forecast panel scroll. */
+@media (max-width: 899px) {
+  .home-dock { position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 9; padding: 14px 16px 8px; background: linear-gradient(to top, #0B0D1F 78%, rgba(11, 13, 31, 0)); }
+  .home-dock-inner { max-width: 728px; margin: 0 auto; }
+  .home-dock .footer-actions { margin: 0; }
+  .wrap--tabs.wrap--home { padding-bottom: calc(var(--tabbar-h) + var(--dock-h, 170px) + 16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+  /* With few people the forecast panel sits at the bottom, just above the pinned row; with many it simply follows the list. It is not pinned. */
+  .wrap--home .notify { margin-top: auto; }
+  .wrap--home .tiles, .wrap--home > .panel:not(.notify) { margin-bottom: 14px; }
+}

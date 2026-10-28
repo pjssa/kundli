@@ -328,16 +328,24 @@ async function renderList() {
   const prof = getProfile();
   const me = data.me || {};
   const who = { email: me.email || prof.email || '', name: me.name || prof.name || '', picture: prof.email && me.email && prof.email !== me.email ? '' : (prof.picture || '') };
-  app.innerHTML = `<div class="wrap wrap--tabs">
+  app.innerHTML = `<div class="wrap wrap--tabs${pickMode ? '' : ' wrap--home'}">
     <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
-    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
+    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
     ${pickMode ? '' : notifyPanelHtml(items.some((k) => k.isMine))}
-    ${pickMode ? '' : '<div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a person</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div>'}
+    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a person</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
+  // On phones the Add a person / Feedback row is pinned above the tab bar; the list (forecast panel included) gets bottom room for exactly its height.
+  const dock = document.getElementById('homeDock');
+  if (dock) {
+    const wrapEl = app.querySelector('.wrap');
+    const fitDock = () => wrapEl.style.setProperty('--dock-h', `${dock.offsetHeight}px`);
+    fitDock();
+    if (window.ResizeObserver) new ResizeObserver(fitDock).observe(dock);
+  }
   document.getElementById('signOut')?.addEventListener('click', signOut);
   // A picture that fails to load (blocked, expired link) falls back to the letter.
   document.querySelector('#signOut img.avatar')?.addEventListener('error', (e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar avatar--initial', textContent: initialOf(who) })); });
