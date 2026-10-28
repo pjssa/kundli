@@ -321,10 +321,10 @@ body.locked { overflow: hidden; }
 
 /* Home on phones and tablets: the Add a person / Feedback row stays at the bottom, above the tab bar, while the people and the forecast panel scroll. */
 @media (max-width: 899px) {
-  .home-dock { position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 9; padding: 14px 16px 8px; background: linear-gradient(to top, #0B0D1F 78%, rgba(11, 13, 31, 0)); }
+  .home-dock { position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 9; padding: 8px 16px 12px; background: linear-gradient(to top, #0B0D1F 78%, rgba(11, 13, 31, 0)); }
   .home-dock-inner { max-width: 728px; margin: 0 auto; }
   .home-dock .footer-actions { margin: 0; }
-  .wrap--tabs.wrap--home { padding-bottom: calc(var(--tabbar-h) + var(--dock-h, 170px) + 16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+  .wrap--tabs.wrap--home { padding-bottom: calc(var(--tabbar-h) + var(--dock-h, 170px) + 8px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
   /* With few people the forecast panel sits at the bottom, just above the pinned row; with many it simply follows the list. It is not pinned. */
   .wrap--home .notify { margin-top: auto; }
   .wrap--home .tiles, .wrap--home > .panel:not(.notify) { margin-bottom: 14px; }
