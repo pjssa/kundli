@@ -296,7 +296,7 @@ async function renderList() {
     <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>
     <p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
-    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span></div>`).join('')}</div>`
+    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;margin-top:8px;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} style="width:auto;" /> This is me</label></div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
     ${notifyPanelHtml(items.some((k) => k.isMine))}
     ${footerHtml()}
@@ -309,6 +309,16 @@ async function renderList() {
   wireNotifyPanel();
   askWhichIsMine(items);
   document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
+  // The tick sits on the tile so nobody has to open a chart to mark it; it must not also open the chart.
+  app.querySelectorAll('[data-mine]').forEach((box) => {
+    box.closest('label').addEventListener('click', (e) => e.stopPropagation());
+    box.addEventListener('keydown', (e) => e.stopPropagation());
+    box.addEventListener('change', async () => {
+      box.disabled = true;
+      try { await call('kundliPublic_setMine', { kundliId: box.dataset.mine, mine: box.checked }); } catch (err) { alert(err.message); }
+      renderList();
+    });
+  });
   app.querySelectorAll('[data-open]').forEach((el) => {
     const go = () => renderDetail(el.dataset.open);
     el.addEventListener('click', go);
