@@ -267,3 +267,8 @@ body.locked { overflow: hidden; }
   #back { display: none; }
   .change-person { display: inline-flex; align-items: center; }
 }
+
+/* On the tabs only the name shows; Edit, Delete, the me tick, birth details and the birth-time help live on the Person tab. */
+.tile--pick { padding: 16px; font-size: 17px; }
+.tile-note { display: block; margin-top: 8px; font-size: 13px; color: var(--ink-muted); }
+@media (max-width: 899px) { .born-line, .timebanner { display: none; } }

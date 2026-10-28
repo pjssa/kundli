@@ -321,21 +321,23 @@ async function renderList() {
   knownIds = items.map((k) => k.kundliId);
   if (items.length === 1) chooseId(items[0].kundliId);
   else if (selectedId && !knownIds.includes(selectedId)) chooseId('');
+  // While choosing a person for Ask, Check or Chart the list shows names only; every option stays on the Person tab.
+  const pickMode = !!(pickTab && items.length);
   const prof = getProfile();
   const me = data.me || {};
   const who = { email: me.email || prof.email || '', name: me.name || prof.name || '', picture: prof.email && me.email && prof.email !== me.email ? '' : (prof.picture || '') };
   app.innerHTML = `<div class="wrap wrap--tabs">
-    <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>
-    ${pickTab && items.length ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
-    <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
-    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;margin-top:8px;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label></div>`).join('')}</div>`
+    <div class="top"><h1>Cosmic Math</h1>${pickMode ? '' : `<button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button>`}</div>
+    ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
+    ${pickMode ? '' : '<div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>'}
+    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}<span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;margin-top:8px;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label></div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
-    ${notifyPanelHtml(items.some((k) => k.isMine))}
-    ${footerHtml()}
-    ${tabBarHtml(pickTab || 'person')}
+    ${pickMode ? '' : notifyPanelHtml(items.some((k) => k.isMine))}
+    ${pickMode ? '' : footerHtml()}
+    ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
-  document.getElementById('signOut').addEventListener('click', signOut);
+  document.getElementById('signOut')?.addEventListener('click', signOut);
   // A picture that fails to load (blocked, expired link) falls back to the letter.
   document.querySelector('#signOut img.avatar')?.addEventListener('error', (e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar avatar--initial', textContent: initialOf(who) })); });
   onLangChange = null;
@@ -343,7 +345,7 @@ async function renderList() {
   wireNotifyPanel();
   askWhichIsMine(items);
   if (pendingDaily) openDailyFromLink();
-  document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
+  document.getElementById('addBtn')?.addEventListener('click', () => openModal(null, renderList));
   // The tick sits on the tile so nobody has to open a chart to mark it; it must not also open the chart.
   app.querySelectorAll('[data-mine]').forEach((box) => {
     box.closest('label').addEventListener('click', (e) => e.stopPropagation());
@@ -353,6 +355,10 @@ async function renderList() {
       try { await call('kundliPublic_setMine', { kundliId: box.dataset.mine, mine: box.checked }); } catch (err) { alert(err.message); }
       renderList();
     });
+  });
+  app.querySelectorAll('[data-rectify]').forEach((btn) => {
+    btn.addEventListener('keydown', (e) => e.stopPropagation());
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openRectify(btn.dataset.rectify); });
   });
   // Edit and Delete sit on the tile, since a phone has no person screen header to hold them.
   app.querySelectorAll('[data-edit], [data-del]').forEach((btn) => {
@@ -378,7 +384,7 @@ async function renderList() {
 // ---------------------------------------------------------------- person + chat
 
 // Bottom tab bar on every screen (phones and tablets). Ask, Check and Chart work on one person, so tapping one asks
-// who first unless a person is already chosen; Person is the list of everyone. On wide screens the bar is hidden and the
+// who first unless a person is already chosen; Home is the list of everyone, and the screen the app opens on. On wide screens the bar is hidden and the
 // page shows everything, as before. Mirrors KundliReading.js.
 let detailTab = 'ask';       // last of ask / check / chart that was open
 let selectedId = '';         // the person the tabs work on, remembered on this device
@@ -388,12 +394,12 @@ let detailId = '';           // the person whose screen is showing now, empty on
 const SELECTED_KEY = 'ssa_kundli_selected';
 try { selectedId = localStorage.getItem(SELECTED_KEY) || ''; } catch { /* storage blocked: nobody is remembered */ }
 const chooseId = (id) => { selectedId = id; try { if (id) localStorage.setItem(SELECTED_KEY, id); else localStorage.removeItem(SELECTED_KEY); } catch { /* ignore */ } };
-const TABS = [['ask', 'Ask'], ['check', 'Check'], ['chart', 'Chart'], ['person', 'Person']];
+const TABS = [['home', 'Home'], ['ask', 'Ask'], ['check', 'Check'], ['chart', 'Chart']];
 const TAB_ICONS = {
+  home: '<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/>',
   ask: '<path d="M4 5h16v11H9l-5 4z"/>',
   check: '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
   chart: '<rect x="4" y="4" width="16" height="16"/><path d="M4 12h16M12 4v16"/>',
-  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
 };
 const tabBarHtml = (active) => `<nav class="tabbar" aria-label="Sections">${TABS.map(([id, label]) => `<button type="button" data-tab="${id}"${id === active ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${TAB_ICONS[id]}</svg><span>${label}</span></button>`).join('')}</nav>`;
 function showTab(id) {
@@ -403,7 +409,7 @@ function showTab(id) {
 }
 function goTab(id) {
   window.scrollTo(0, 0);
-  if (id === 'person') { pickTab = ''; renderList(); return; }
+  if (id === 'home') { pickTab = ''; renderList(); return; }
   if (knownIds.length === 1) chooseId(knownIds[0]);
   if (!selectedId || !knownIds.includes(selectedId)) { detailTab = id; pickTab = id; renderList(); return; }
   if (detailId === selectedId) showTab(id); else { detailTab = id; renderDetail(selectedId); }
@@ -427,7 +433,7 @@ async function renderDetail(kundliId) {
   app.innerHTML = `<div class="wrap wrap--tabs">
     <button class="btn-link" id="back">&larr; Everyone</button>
     <div class="top"><h1>${esc(k.name)}</h1><button type="button" class="btn-secondary btn-small change-person" id="changePerson">Change</button></div>
-    <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
+    <p class="muted born-line">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
     <div class="pane" data-pane="person">
     <div style="display:flex;gap:8px;margin:8px 0;"><button class="btn-secondary btn-small" id="edit">Edit</button><button class="btn-danger btn-small" id="del">Delete</button></div>
     </div>
