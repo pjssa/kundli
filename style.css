@@ -258,3 +258,12 @@ body.locked { overflow: hidden; }
   .wrap--tabs .composer { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: 10px; }
   .wrap--tabs .chat.full .composer { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 }
+
+/* Tabs on every screen: the list of people is the Person tab. Edit and Delete live on its tiles, and Change picks another person. */
+.change-person { display: none; }
+.tile-actions { display: flex; gap: 8px; margin-top: 8px; }
+.pick-prompt { margin: 6px 0; padding: 10px 12px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; font-size: 15px; }
+@media (max-width: 899px) {
+  #back { display: none; }
+  .change-person { display: inline-flex; align-items: center; }
+}
