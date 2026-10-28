@@ -332,6 +332,7 @@ async function renderDetail(kundliId) {
     <div class="top"><h1>${esc(k.name)}</h1>
       <div style="display:flex;gap:8px;"><button class="btn-secondary btn-small" id="edit">Edit</button><button class="btn-danger btn-small" id="del">Delete</button></div></div>
     <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
+    <label class="tu" style="display:flex;gap:6px;align-items:center;margin:6px 0;"><input type="checkbox" id="mineTick" ${k.isMine ? 'checked' : ''} style="width:auto;" /> This is my own chart <span class="muted">(your 7 am daily forecast is about it)</span></label>
     ${k.timeUnknown ? `<div class="timebanner"><span>${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events, so answers about houses are approximate.` : 'Birth time not known, so answers are approximate until you find it.'}</span><button type="button" class="btn-secondary btn-small" id="rectifyBtn">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></div>` : ''}
 
     <div class="panel chat" id="chat">
@@ -390,6 +391,13 @@ async function renderDetail(kundliId) {
 
   document.getElementById('back').addEventListener('click', renderList);
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
+  document.getElementById('mineTick').addEventListener('change', async (e) => {
+    const box = e.target;
+    box.disabled = true;
+    try { await call('kundliPublic_setMine', { kundliId: k.kundliId, mine: box.checked }); k.isMine = box.checked; peopleCache = null; }
+    catch (err) { box.checked = !box.checked; alert(err.message); }
+    box.disabled = false;
+  });
   document.getElementById('rectifyBtn')?.addEventListener('click', () => openRectify(k.kundliId));
   document.getElementById('del').addEventListener('click', async (e) => {
     if (!window.confirm(`Delete ${k.name} and the saved chat? This cannot be undone.`)) return;
