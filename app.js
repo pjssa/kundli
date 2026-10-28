@@ -281,6 +281,27 @@ function askWhichIsMine(items) {
   });
 }
 
+// The 7 am notification opens this: today's forecast in a popup, readable in full.
+function showDailyPopup(m) {
+  document.getElementById('dailyPopup')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'dailyPopup';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;z-index:40;';
+  overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;"><h2 style="margin:0 0 10px;">${esc(m.title)}</h2>
+    ${String(m.body).split('\n').filter(Boolean).map((l) => `<p style="margin:0 0 10px;line-height:1.5;">${esc(l)}</p>`).join('')}
+    <div class="actions"><button class="btn-primary" id="dailyClose">Close</button></div></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#dailyClose').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+let pendingDaily = new URLSearchParams(location.search).has('daily');
+async function openDailyFromLink() {
+  pendingDaily = false;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
+  try { showDailyPopup(await call('kundliPublic_dailyForecast')); } catch (err) { showDailyPopup({ title: 'Daily forecast', body: err.message }); }
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'daily') showDailyPopup(e.data); });
+
 async function renderList() {
   peopleCache = null;
   if (!getSession() && !currentToken()) return showSignIn();
@@ -308,6 +329,7 @@ async function renderList() {
   wireFooter();
   wireNotifyPanel();
   askWhichIsMine(items);
+  if (pendingDaily) openDailyFromLink();
   document.getElementById('addBtn').addEventListener('click', () => openModal(null, renderList));
   // The tick sits on the tile so nobody has to open a chart to mark it; it must not also open the chart.
   app.querySelectorAll('[data-mine]').forEach((box) => {

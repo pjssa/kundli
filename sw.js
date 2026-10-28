@@ -13,9 +13,12 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
-  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+  const n = event.notification;
+  const url = new URL(n.data?.url || '/', self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (wins) => {
     const open = wins.find((w) => w.url.startsWith(self.location.origin));
-    return open ? open.focus() : self.clients.openWindow(url);
+    // An open app shows the message in a popup straight away; a closed one opens with ?daily=1 and does the same after loading.
+    if (open) { open.postMessage({ type: 'daily', title: n.title, body: n.body }); return open.focus(); }
+    return self.clients.openWindow(url);
   }));
 });
