@@ -262,9 +262,15 @@ async function wireNotifyPanel() {
 
 // Asked once each time the app is opened until a chart is marked as the person's own; "Not now" only silences it for this visit.
 let askedMine = false;
+// One chart can only be the signed-in person's own, so it is marked without asking, and its tile tick stays locked
+// (see renderList). With two or more charts the person picks below, or ticks one on the list.
+async function autoMarkMine(k) {
+  try { await call('kundliPublic_setMine', { kundliId: k.kundliId, mine: true }); renderList(); } catch { /* the tick on the tile still works */ }
+}
 function askWhichIsMine(items) {
   if (askedMine || !items.length || items.some((k) => k.isMine)) return;
   askedMine = true;
+  if (items.length === 1) { autoMarkMine(items[0]); return; }
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
   overlay.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin-top:24px;"><h2>Which one is you?</h2>
@@ -304,6 +310,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
 
 async function renderList() {
   peopleCache = null;
+  detailTab = 'ask';
   if (!getSession() && !currentToken()) return showSignIn();
   app.innerHTML = `<div class="wrap"><p class="muted">Loading&hellip;</p></div>`;
   let data;
@@ -317,7 +324,7 @@ async function renderList() {
     <div class="top"><h1>Cosmic Math</h1><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>
     <p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>
     <div class="actions" style="margin-top:8px;"><button class="btn-primary" id="addBtn">+ Add a person</button></div>
-    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;margin-top:8px;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} style="width:auto;" /> This is me</label></div>`).join('')}</div>`
+    ${items.length ? `<div class="tiles">${items.map((k) => `<div class="tile" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="muted">Born ${esc(fmtBirth(k))}<br>${esc(k.place || '')}<br>${k.questionCount} question${k.questionCount === 1 ? '' : 's'}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;margin-top:8px;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label></div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
     ${notifyPanelHtml(items.some((k) => k.isMine))}
     ${footerHtml()}
@@ -350,6 +357,27 @@ async function renderList() {
 
 // ---------------------------------------------------------------- person + chat
 
+// Bottom tab bar on a person's screen (phones and tablets): each tab shows one pane, the others stay in the page so every
+// handler keeps working. On wide screens the bar is hidden and every pane shows, as before. Mirrors KundliReading.js.
+let detailTab = 'ask';
+const TABS = [['ask', 'Ask'], ['check', 'Check'], ['chart', 'Chart'], ['person', 'Person']];
+const TAB_ICONS = {
+  ask: '<path d="M4 5h16v11H9l-5 4z"/>',
+  check: '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+  chart: '<rect x="4" y="4" width="16" height="16"/><path d="M4 12h16M12 4v16"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+};
+const tabBarHtml = () => `<nav class="tabbar" aria-label="Sections">${TABS.map(([id, label]) => `<button type="button" data-tab="${id}"${id === detailTab ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${TAB_ICONS[id]}</svg><span>${label}</span></button>`).join('')}</nav>`;
+function showTab(id) {
+  detailTab = id;
+  app.querySelectorAll('.pane').forEach((p) => p.classList.toggle('pane--off', p.dataset.pane !== id));
+  app.querySelectorAll('.tabbar [data-tab]').forEach((b) => (b.dataset.tab === id ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
+}
+function wireTabs() {
+  app.querySelectorAll('.tabbar [data-tab]').forEach((b) => b.addEventListener('click', () => { showTab(b.dataset.tab); window.scrollTo(0, 0); }));
+  showTab(detailTab);
+}
+
 async function renderDetail(kundliId) {
   app.innerHTML = `<div class="wrap"><p class="muted">Calculating chart&hellip;</p></div>`;
   let data;
@@ -359,14 +387,16 @@ async function renderDetail(kundliId) {
   let hist = [...history];
   onLangChange = null;
 
-  app.innerHTML = `<div class="wrap">
+  app.innerHTML = `<div class="wrap wrap--tabs">
     <button class="btn-link" id="back">&larr; Everyone</button>
-    <div class="top"><h1>${esc(k.name)}</h1>
-      <div style="display:flex;gap:8px;"><button class="btn-secondary btn-small" id="edit">Edit</button><button class="btn-danger btn-small" id="del">Delete</button></div></div>
+    <div class="top"><h1>${esc(k.name)}</h1></div>
     <p class="muted">Born ${esc(fmtBirth(k))} &middot; ${esc(k.place || '')}</p>
-    <label class="tu" style="display:flex;gap:6px;align-items:center;margin:6px 0;"><input type="checkbox" id="mineTick" ${k.isMine ? 'checked' : ''} style="width:auto;" /> This is my own chart <span class="muted">(your 7 am daily forecast is about it)</span></label>
+    <div class="pane" data-pane="person">
+    <div style="display:flex;gap:8px;margin:8px 0;"><button class="btn-secondary btn-small" id="edit">Edit</button><button class="btn-danger btn-small" id="del">Delete</button></div>
     ${k.timeUnknown ? `<div class="timebanner"><span>${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events, so answers about houses are approximate.` : 'Birth time not known, so answers are approximate until you find it.'}</span><button type="button" class="btn-secondary btn-small" id="rectifyBtn">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></div>` : ''}
+    </div>
 
+    <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
       <div class="top"><h2 style="margin:0;">Ask CosmicMath</h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
@@ -380,7 +410,9 @@ async function renderDetail(kundliId) {
         </div>
       </form>
     </div>
+    </div>
 
+    <div class="pane" data-pane="check">
     <div class="panel" id="suitPanel">
       <h2 style="margin:0 0 6px;">Name, number &amp; company check</h2>
       <p class="muted">See whether a name, mobile number or company name suits ${esc(k.name)}, by numerology and the birth chart, with spelling corrections.</p>
@@ -395,11 +427,16 @@ async function renderDetail(kundliId) {
       <p class="error" id="suitErr" hidden></p>
       <div class="suit-out msg msg--pandit" id="suitOut" hidden></div>
     </div>
+    </div>
 
-    <div class="panel"><details><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
-    ${footerHtml()}
+    <div class="pane" data-pane="chart">
+    <div class="panel"><details ${window.matchMedia('(max-width: 899px)').matches ? 'open' : ''}><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
+    </div>
+    <div class="pane" data-pane="person">${footerHtml()}</div>
+    ${tabBarHtml()}
   </div>`;
   wireFooter();
+  wireTabs();
   const suitKind = document.getElementById('suitKind');
   suitKind.addEventListener('change', () => {
     document.getElementById('suitVal').placeholder = SUIT_HINT[suitKind.value];
@@ -423,13 +460,6 @@ async function renderDetail(kundliId) {
 
   document.getElementById('back').addEventListener('click', renderList);
   document.getElementById('edit').addEventListener('click', () => openModal(k, () => renderDetail(k.kundliId)));
-  document.getElementById('mineTick').addEventListener('change', async (e) => {
-    const box = e.target;
-    box.disabled = true;
-    try { await call('kundliPublic_setMine', { kundliId: k.kundliId, mine: box.checked }); k.isMine = box.checked; peopleCache = null; }
-    catch (err) { box.checked = !box.checked; alert(err.message); }
-    box.disabled = false;
-  });
   document.getElementById('rectifyBtn')?.addEventListener('click', () => openRectify(k.kundliId));
   document.getElementById('del').addEventListener('click', async (e) => {
     if (!window.confirm(`Delete ${k.name} and the saved chat? This cannot be undone.`)) return;
@@ -498,8 +528,9 @@ async function renderDetail(kundliId) {
     if (!chat.isConnected) { document.removeEventListener('keydown', onEsc); document.body.classList.remove('locked'); return; }
     if (e.key === 'Escape' && chat.classList.contains('full')) choose(false);
   };
-  let startFull = true;
-  try { startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
+  // On phones and tablets the bottom tab bar is the navigation, and full screen would hide it, so there it is opt-in.
+  let startFull = !window.matchMedia('(max-width: 899px)').matches;
+  try { if (startFull) startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
   if (startFull) setFull(true);
   document.addEventListener('keydown', onEsc);
   thread.addEventListener('click', async (ev) => {
@@ -1008,7 +1039,6 @@ function openModal(k, done) {
       <div id="placeStatus" class="place-status" aria-live="polite"></div>
       <p class="muted" id="timeHint">${k?.timeUnknown ? 'We will help you find the birth time from life events.' : 'The exact birth time matters: the ascendant changes about every two hours.'}</p>
       <label>Gender (optional)<select name="gender">${['', 'Male', 'Female', 'Other'].map((g) => `<option value="${g}" ${k?.gender === g ? 'selected' : ''}>${g || 'Prefer not to say'}</option>`).join('')}</select></label>
-      <label class="tu" style="display:block;margin:8px 0;"><input type="checkbox" name="isMine" ${k?.isMine ? 'checked' : ''} style="width:auto;" /> This is my own chart (the 7 am daily forecast is about it)</label>
       <p class="error" id="ferr" hidden></p>
       <div class="actions"><button type="button" class="btn-secondary" id="cancel">Cancel</button><button type="submit" class="btn-primary">${isEdit ? 'Save changes' : 'Create'}</button></div>
     </form></div>`;
@@ -1034,8 +1064,6 @@ function openModal(k, done) {
       // Coordinates and time zone are worked out server-side from the place.
       const out = await guarded(() => call('kundliPublic_save', { kundliId: k?.kundliId, name: fd.get('name'), gender: fd.get('gender'), birthDate: fd.get('birthDate'), birthTime: fd.get('birthTime'), timeUnknown: fd.get('timeUnknown') === 'on', place: fd.get('place') }));
       if (!out) { close(); return; }
-      const mine = fd.get('isMine') === 'on';
-      if (mine !== !!k?.isMine) await call('kundliPublic_setMine', { kundliId: out.kundliId, mine });
       close();
       // A new kundli without a birth time goes straight to finding it; an edit only does when no time has been settled yet.
       if (fd.get('timeUnknown') === 'on' && (!isEdit || k?.rectification?.status !== 'applied')) { openRectify(out.kundliId); return; }
