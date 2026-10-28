@@ -312,6 +312,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
 async function renderList() {
   peopleCache = null;
   detailId = '';
+  document.body.classList.remove('locked');
   if (!getSession() && !currentToken()) return showSignIn();
   app.innerHTML = `<div class="wrap"><p class="muted">Loading&hellip;</p></div>`;
   let data;
@@ -402,10 +403,16 @@ const TAB_ICONS = {
   chart: '<rect x="4" y="4" width="16" height="16"/><path d="M4 12h16M12 4v16"/>',
 };
 const tabBarHtml = (active) => `<nav class="tabbar" aria-label="Sections">${TABS.map(([id, label]) => `<button type="button" data-tab="${id}"${id === active ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${TAB_ICONS[id]}</svg><span>${label}</span></button>`).join('')}</nav>`;
+// The chat's full-screen lock must only hold while the chat itself is showing, or the other tabs could not scroll.
+function syncLock() {
+  const c = document.getElementById('chat');
+  document.body.classList.toggle('locked', !!c && c.classList.contains('full') && (!window.matchMedia('(max-width: 899px)').matches || detailTab === 'ask'));
+}
 function showTab(id) {
   detailTab = id;
   app.querySelectorAll('.pane').forEach((p) => p.classList.toggle('pane--off', p.dataset.pane !== id));
   app.querySelectorAll('.tabbar [data-tab]').forEach((b) => (b.dataset.tab === id ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
+  syncLock();
 }
 function goTab(id) {
   window.scrollTo(0, 0);
@@ -441,7 +448,7 @@ async function renderDetail(kundliId) {
 
     <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;">Ask CosmicMath</h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
+      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
@@ -515,6 +522,8 @@ async function renderDetail(kundliId) {
   const thread = document.getElementById('thread');
   const clearBtn = document.getElementById('clear');
   const qBox = document.getElementById('q');
+  // A one-line box on a phone cannot hold the long example.
+  if (window.matchMedia('(max-width: 899px)').matches) qBox.placeholder = 'Ask anything\u2026';
   const sendBtn = document.getElementById('send');
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
@@ -560,7 +569,7 @@ async function renderDetail(kundliId) {
   const fullBtn = document.getElementById('full');
   const setFull = (on) => {
     chat.classList.toggle('full', on);
-    document.body.classList.toggle('locked', on);
+    syncLock();
     fullBtn.innerHTML = on ? 'Exit<span class="lg"> full screen</span>' : 'Full<span class="lg"> screen</span>';
     fullBtn.setAttribute('aria-pressed', String(on));
     toBottom();
@@ -573,9 +582,9 @@ async function renderDetail(kundliId) {
     if (!chat.isConnected) { document.removeEventListener('keydown', onEsc); document.body.classList.remove('locked'); return; }
     if (e.key === 'Escape' && chat.classList.contains('full')) choose(false);
   };
-  // On phones and tablets the bottom tab bar is the navigation, and full screen would hide it, so there it is opt-in.
-  let startFull = !window.matchMedia('(max-width: 899px)').matches;
-  try { if (startFull) startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
+  // On phones and tablets the chat is always full screen, WhatsApp style, with the tab bar kept below it. Wide screens keep the remembered choice.
+  let startFull = true;
+  try { if (!window.matchMedia('(max-width: 899px)').matches) startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
   if (startFull) setFull(true);
   document.addEventListener('keydown', onEsc);
   thread.addEventListener('click', async (ev) => {
