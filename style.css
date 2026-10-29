@@ -290,7 +290,7 @@ body.locked { overflow: hidden; }
   .wrap--tabs .chat.full .composer { position: static; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 6px 0 0; padding: 6px 0 8px; background: none; }
   .wrap--tabs .chat.full .composer textarea { flex: 1 1 0; min-width: 0; min-height: 44px; max-height: 120px; border-radius: 22px; padding: 11px 16px; }
   .wrap--tabs .chat.full .send-col { display: contents; }
-  .wrap--tabs .chat.full .send-col #mic { order: 1; }
+  .wrap--tabs .chat.full .send-col #mic { order: 1; width: 44px; flex: none; }
   .wrap--tabs .chat.full .send-col #send { order: 2; width: auto; flex: none; min-height: 44px; padding: 0 20px; border-radius: 22px; }
   .wrap--tabs .chat.full .combine-tick { order: 3; flex: 1 0 100%; font-size: 12px; opacity: .8; }
 }
