@@ -544,7 +544,7 @@ async function renderDetail(kundliId) {
   const setTyping = (on) => document.body.classList.toggle('typing', on && window.matchMedia('(max-width: 899px)').matches);
   qBox.addEventListener('focus', () => setTyping(true));
   qBox.addEventListener('blur', () => setTyping(false));
-  // Tapping Send keeps the keyboard open, like a messaging app, so the layout does not jump under the finger.
+  // Tapping Send does not move focus mid-tap, so the layout does not jump under the finger; the box is released after the send (see submit).
   sendBtn.addEventListener('pointerdown', (e) => { if (document.activeElement === qBox) e.preventDefault(); });
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
@@ -738,7 +738,10 @@ async function renderDetail(kundliId) {
     sendBtn.disabled = true;
     thread.querySelector('.hint')?.remove();
     thread.insertAdjacentHTML('beforeend', `<div class="msg msg--me pending"><p>${esc(question)}</p></div><div class="msg msg--pandit typing"><p class="muted">CosmicMath is studying the chart&hellip;</p></div>`);
-    qBox.value = ''; grow(); landOnAnswer = false; toBottom();
+    qBox.value = ''; grow(); landOnAnswer = false;
+    // On a touch screen the keyboard closes once a question is sent so the answer can be read.
+    if (window.matchMedia('(pointer: coarse)').matches) qBox.blur();
+    toBottom();
     const dropPending = () => thread.querySelectorAll('.pending, .typing').forEach((n) => n.remove());
     try {
       if (COMBINE_RE.test(question) || COMBINE_MATTER_RE.test(question)) {
