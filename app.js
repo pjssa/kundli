@@ -5,6 +5,7 @@
  * as frontend/form/. The server scopes every call to the verified email, so
  * nothing here can reach another person's data.
  */
+import { ideasFor } from './questions.js';
 import { autoRead, canListen, canSpeak, createMic, isSpeaking, setAutoRead, speak, speechText, stopSpeech, unlockSpeech } from './voice.js';
 
 const API_URL = 'https://jxybttdluexpbwsjzney.supabase.co/functions/v1/api';
@@ -488,7 +489,7 @@ async function renderDetail(kundliId) {
 
     <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button>${canSpeak ? `<button class="btn-secondary btn-small" id="voiceOn" aria-pressed="${autoRead()}" title="Read new answers aloud">&#128266;<span class="lg"> Voice</span></button>` : ''}<button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small chat-change" id="chatChange">Change</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
+      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small ideas-btn" id="ideas" aria-label="Question ideas" title="Question ideas">i</button><button class="btn-secondary btn-small" id="langTop">Language</button>${canSpeak ? `<button class="btn-secondary btn-small" id="voiceOn" aria-pressed="${autoRead()}" title="Read new answers aloud">&#128266;<span class="lg"> Voice</span></button>` : ''}<button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small chat-change" id="chatChange">Change</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${threadHtml(kundliId, hist, hintHtml())}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
@@ -669,13 +670,30 @@ async function renderDetail(kundliId) {
     const chip = e.target.closest('.fu-chip');
     if (!chip) return;
     // Suggestions are added to the question box for the person to edit and send; tapping several joins them, tapping one again takes it out.
-    const t = chip.textContent;
-    qBox.value = qBox.value.includes(t) ? qBox.value.replace(t, '').replace(/\s{2,}/g, ' ').trim() : `${qBox.value.trim()} ${t}`.trim();
-    grow(); syncChips();
+    toggleAsk(chip.textContent);
     qBox.focus(); qBox.setSelectionRange(qBox.value.length, qBox.value.length);
   });
-  const syncChips = () => thread.querySelectorAll('.fu-chip').forEach((c) => c.setAttribute('aria-pressed', String(qBox.value.includes(c.textContent))));
-  qBox.addEventListener('input', syncChips);
+  const toggleAsk = (t) => {
+    qBox.value = qBox.value.includes(t) ? qBox.value.replace(t, '').replace(/\s{2,}/g, ' ').trim() : `${qBox.value.trim()} ${t}`.trim();
+    grow(); syncChips();
+  };
+  const syncChips = (scope = thread) => scope.querySelectorAll('.fu-chip').forEach((c) => c.setAttribute('aria-pressed', String(qBox.value.includes(c.textContent))));
+  qBox.addEventListener('input', () => syncChips());
+  // The "i" button: ten ideas per topic. Tapping adds them to the question box (several can be joined); asked ones drop out and new ones appear next time.
+  document.getElementById('ideas').addEventListener('click', () => {
+    const o = document.createElement('div');
+    o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
+    const topics = ideasFor(hist.map((x) => x.question));
+    o.innerHTML = `<div class="panel" style="max-width:520px;width:100%;margin-top:24px;"><h2>Questions you can ask</h2>
+      <p class="muted">Tap a question to put it in the question box; tap several to ask them together. Questions you have asked are replaced by new ones.</p>
+      <div class="ideas">${topics.map(([topic, list], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(topic)}</summary><div class="fu-chips">${list.map((q) => `<button type="button" class="fu-chip" aria-pressed="false">${esc(q)}</button>`).join('')}</div></details>`).join('')}</div>
+      <div class="actions" style="margin-top:12px;"><button type="button" class="btn-primary" id="ideasDone">Done</button></div></div>`;
+    document.body.appendChild(o);
+    syncChips(o);
+    o.querySelector('#ideasDone').addEventListener('click', () => o.remove());
+    o.addEventListener('click', (e) => { if (e.target === o) o.remove(); });
+    o.querySelector('.ideas').addEventListener('click', (e) => { const chip = e.target.closest('.fu-chip'); if (chip) { toggleAsk(chip.textContent); syncChips(o); } });
+  });
   renderFollowUps();
 
   qBox.addEventListener('keydown', (e) => {
