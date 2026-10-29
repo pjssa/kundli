@@ -86,6 +86,9 @@ body.locked { overflow: hidden; }
 .chat.full .thread { flex: 1; max-height: none; }
 
 .send-col { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.mic { flex: none; min-width: 44px; min-height: 44px; padding: 0; border-radius: 22px; font-size: 18px; line-height: 1; }
+.mic--on { background: #C0392B; border-color: #C0392B; color: #fff; animation: mic-pulse 1.1s ease-in-out infinite; }
+@keyframes mic-pulse { 50% { box-shadow: 0 0 0 8px rgba(192, 57, 43, 0.25); } }
 .combine-tick input { width: auto; margin: 0; }
 .combine-tick { display: flex; align-items: center; gap: 6px; font-size: 0.85em; cursor: pointer; white-space: nowrap; }
 .pick { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 15px; font-weight: 500; color: var(--ink); }
@@ -287,6 +290,7 @@ body.locked { overflow: hidden; }
   .wrap--tabs .chat.full .composer { position: static; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 6px 0 0; padding: 6px 0 8px; background: none; }
   .wrap--tabs .chat.full .composer textarea { flex: 1 1 0; min-width: 0; min-height: 44px; max-height: 120px; border-radius: 22px; padding: 11px 16px; }
   .wrap--tabs .chat.full .send-col { display: contents; }
+  .wrap--tabs .chat.full .send-col #mic { order: 1; }
   .wrap--tabs .chat.full .send-col #send { order: 2; width: auto; flex: none; min-height: 44px; padding: 0 20px; border-radius: 22px; }
   .wrap--tabs .chat.full .combine-tick { order: 3; flex: 1 0 100%; font-size: 12px; opacity: .8; }
 }

@@ -5,6 +5,8 @@
  * as frontend/form/. The server scopes every call to the verified email, so
  * nothing here can reach another person's data.
  */
+import { canListen, canSpeak, createMic, speak, speechText, stopSpeech, unlockSpeech } from './voice.js';
+
 const API_URL = 'https://jxybttdluexpbwsjzney.supabase.co/functions/v1/api';
 const GOOGLE_CLIENT_ID = '741282599231-qcp7doaqr32vd44eue2lrp6utijpa3s2.apps.googleusercontent.com';
 const TOKEN_KEY = 'ssa_kundli_idtoken';
@@ -484,6 +486,7 @@ async function renderDetail(kundliId) {
       <form class="composer" id="askForm">
         <textarea id="q" rows="1" placeholder="Ask anything, e.g. Will I get a promotion this year?"></textarea>
         <div class="send-col">
+          ${canListen ? '<button class="btn-secondary mic" id="mic" type="button" aria-label="Talk to ask" aria-pressed="false" title="Talk to ask">&#127908;</button>' : ''}
           <button class="btn-primary" id="send" type="submit">Send</button>
         </div>
       </form>
@@ -545,6 +548,7 @@ async function renderDetail(kundliId) {
   sendBtn.addEventListener('pointerdown', (e) => { if (document.activeElement === qBox) e.preventDefault(); });
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
+  let voiceAsked = false, speakNext = false;
   const toBottom = () => {
     const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
     // scrollIntoView moves the chat box and the page together; on a phone the page itself had been left scrolled down at the composer.
@@ -578,6 +582,8 @@ async function renderDetail(kundliId) {
     clearBtn.hidden = !hist.length;
     toBottom();
     renderFollowUps();
+    // A question asked by voice is answered by voice.
+    if (speakNext && hist[0]) { speakNext = false; speak(speechText(hist[0]), hist[0].lang || lang); }
   };
   // Picking a language only affects new questions; fetch its headings now so the next answer shows at once.
   onLangChange = () => { if (lang && lang !== 'en' && !labelCache.has(lang)) fetchLabels([lang]); };
@@ -605,6 +611,14 @@ async function renderDetail(kundliId) {
   try { if (!window.matchMedia('(max-width: 899px)').matches) startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
   if (startFull) setFull(true);
   document.addEventListener('keydown', onEsc);
+  thread.addEventListener('click', (ev) => {
+    const sp = ev.target.closest('[data-speak]');
+    if (!sp) return;
+    unlockSpeech();
+    if (speechSynthesis.speaking) { stopSpeech(); return; }
+    const entry = hist.find((x) => x.askedAt === sp.dataset.speak);
+    if (entry) speak(speechText(entry), entry.lang || lang);
+  });
   thread.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('[data-del]');
     if (!btn || !window.confirm('Delete this question and its answer?')) return;
@@ -652,6 +666,27 @@ async function renderDetail(kundliId) {
     // Touch keyboards keep Enter as a new line; the Send button sends.
     if (e.key === 'Enter' && !e.shiftKey && !window.matchMedia('(pointer: coarse)').matches) { e.preventDefault(); document.getElementById('askForm').requestSubmit(); }
   });
+  // Mic: tap, speak, and the question is sent when you stop talking; the answer is then read aloud.
+  const micBtn = document.getElementById('mic');
+  if (micBtn) {
+    const mic = createMic({
+      getLang: () => lang,
+      onText: (t) => { qBox.value = t; grow(); },
+      onError: (m) => { const e = document.getElementById('askErr'); e.textContent = m; e.hidden = false; },
+      onEnd: (text) => {
+        micBtn.setAttribute('aria-pressed', 'false'); micBtn.classList.remove('mic--on');
+        if (text && !sendBtn.disabled) { voiceAsked = true; document.getElementById('askForm').requestSubmit(); }
+      },
+    });
+    micBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+    micBtn.addEventListener('click', () => {
+      stopSpeech(); unlockSpeech();
+      if (mic.active) { mic.stop(); return; }
+      document.getElementById('askErr').hidden = true;
+      micBtn.setAttribute('aria-pressed', 'true'); micBtn.classList.add('mic--on');
+      mic.start();
+    });
+  }
   // Picker bubble: tick whose kundlis to read together, or answer for this person alone.
   const showPicker = (question, people) => {
     const box = document.createElement('div');
@@ -695,6 +730,8 @@ async function renderDetail(kundliId) {
     const question = qBox.value.trim();
     const errEl = document.getElementById('askErr');
     errEl.hidden = true;
+    speakNext = voiceAsked; voiceAsked = false;
+    stopSpeech();
     if (!question || sendBtn.disabled) return;
     sendBtn.disabled = true;
     thread.querySelector('.hint')?.remove();
@@ -890,7 +927,7 @@ function answerHtml(e) {
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
     <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
-      <button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
+      ${canSpeak ? `<button type="button" class="btn-link del" data-speak="${esc(e.askedAt)}">&#128266; Listen</button> ` : ''}<button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
   </div>`;
 }
 
