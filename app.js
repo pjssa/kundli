@@ -548,7 +548,7 @@ async function renderDetail(kundliId) {
   sendBtn.addEventListener('pointerdown', (e) => { if (document.activeElement === qBox) e.preventDefault(); });
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
-  let voiceAsked = false, speakNext = false, askedNow = false;
+  let voiceAsked = false, speakNext = false, askedNow = false, speakingFor = '';
   const toBottom = () => {
     const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
     // scrollIntoView moves the chat box and the page together; on a phone the page itself had been left scrolled down at the composer.
@@ -614,10 +614,12 @@ async function renderDetail(kundliId) {
   thread.addEventListener('click', (ev) => {
     const sp = ev.target.closest('[data-speak]');
     if (!sp) return;
-    unlockSpeech();
-    if (isSpeaking()) { stopSpeech(); return; }
+    // Tapping the answer being read stops it; tapping another (or one while nothing plays) starts it.
+    if (isSpeaking() && speakingFor === sp.dataset.speak) { stopSpeech(); return; }
     const entry = hist.find((x) => x.askedAt === sp.dataset.speak);
-    if (entry) speak(speechText(entry), entry.lang || lang);
+    if (!entry) return;
+    speakingFor = sp.dataset.speak;
+    speak(speechText(entry), entry.lang || lang).then(() => { if (speakingFor === sp.dataset.speak) speakingFor = ''; });
   });
   thread.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('[data-del]');

@@ -31,6 +31,7 @@ export function unlockSpeech() {
 }
 // Own flag, not speechSynthesis.speaking: the silent unlock utterance also counts as speaking, which made the first Listen tap read as Stop.
 let talking = false;
+let gen = 0; // each speak() call owns the voice; a cancelled earlier call must not switch off the new one
 export const stopSpeech = () => { talking = false; if (canSpeak) speechSynthesis.cancel(); };
 export const isSpeaking = () => talking;
 
@@ -53,14 +54,17 @@ function chunks(text, max = 160) {
 export function speak(text, langCode) {
   return new Promise((resolve) => {
     if (!canSpeak || !text) return resolve();
-    speechSynthesis.cancel();
+    // Called straight from the tap: iOS only lets speech start inside the gesture, so there is no delay before the first sentence.
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    speechSynthesis.resume(); // Android Chrome can be left paused, which makes every later speak() silent
     talking = true;
+    const mine = ++gen;
     const lang = bcp(langCode);
     const voice = pickVoice(lang);
     const list = chunks(text);
     let i = 0;
     const next = () => {
-      if (!talking) return resolve();
+      if (mine !== gen || !talking) return resolve();
       if (i >= list.length) { talking = false; return resolve(); }
       const t = list[i++];
       const u = new SpeechSynthesisUtterance(t);
@@ -70,11 +74,10 @@ export function speak(text, langCode) {
       // Chrome sometimes never fires onend; without this the reply would stay "speaking" for ever.
       const dog = setTimeout(() => { speechSynthesis.cancel(); next(); }, 4000 + t.length * 120);
       u.onend = () => { clearTimeout(dog); next(); };
-      u.onerror = () => { clearTimeout(dog); talking = false; resolve(); };
+      u.onerror = () => { clearTimeout(dog); if (mine === gen) talking = false; resolve(); };
       speechSynthesis.speak(u);
     };
-    // Chrome drops a speak() issued in the same tick as cancel(), so the first sentence waits a moment.
-    setTimeout(next, 120);
+    next();
   });
 }
 
