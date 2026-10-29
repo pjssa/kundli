@@ -561,6 +561,12 @@ async function renderDetail(kundliId) {
   let voiceAsked = false, speakNext = false, askedNow = false, speakingFor = '';
   // Suggestions left unasked by the question now being answered; kept under their answer once it arrives.
   let pendingLeft = null;
+  // The button of the answer being read says Stop, so a tap during the automatic reading is not mistaken for a Listen that did nothing.
+  const paintListen = () => thread.querySelectorAll('[data-speak]').forEach((b) => { b.innerHTML = speakingFor === b.dataset.speak ? '&#9209; Stop' : '&#128266; Listen'; });
+  const readOut = (entry) => {
+    speakingFor = entry.askedAt; paintListen();
+    speak(speechText(entry), entry.lang || lang).then(() => { if (speakingFor === entry.askedAt) { speakingFor = ''; paintListen(); } });
+  };
   const commitLeft = () => { if (pendingLeft) leftovers.set(pendingLeft.key, pendingLeft.rest); pendingLeft = null; };
   const toBottom = () => {
     const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
@@ -596,7 +602,7 @@ async function renderDetail(kundliId) {
     toBottom();
     renderFollowUps();
     // A question asked by voice is answered by voice.
-    if ((speakNext || (autoRead() && askedNow)) && hist[0]) { askedNow = false; speakNext = false; speak(speechText(hist[0]), hist[0].lang || lang); }
+    if ((speakNext || (autoRead() && askedNow)) && hist[0]) { askedNow = false; speakNext = false; readOut(hist[0]); }
   };
   // Picking a language only affects new questions; fetch its headings now so the next answer shows at once.
   onLangChange = () => { if (lang && lang !== 'en' && !labelCache.has(lang)) fetchLabels([lang]); };
@@ -630,9 +636,7 @@ async function renderDetail(kundliId) {
     // Tapping the answer being read stops it; tapping another (or one while nothing plays) starts it.
     if (isSpeaking() && speakingFor === sp.dataset.speak) { stopSpeech(); return; }
     const entry = hist.find((x) => x.askedAt === sp.dataset.speak);
-    if (!entry) return;
-    speakingFor = sp.dataset.speak;
-    speak(speechText(entry), entry.lang || lang).then(() => { if (speakingFor === sp.dataset.speak) speakingFor = ''; });
+    if (entry) readOut(entry);
   });
   thread.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('[data-del]');

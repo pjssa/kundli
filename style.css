@@ -59,6 +59,7 @@ button:disabled { opacity: 0.55; cursor: default; }
 .msg .basis { color: var(--ink); font-weight: 400; }
 .msg .del { margin-top: 6px; font-size: 12px; color: var(--ink-muted); }
 .msg-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.msg-actions .del { margin-top: 0; min-height: 40px; padding: 8px 6px; }
 #voiceOn[aria-pressed="false"] { opacity: .55; }
 .hint { margin: auto; text-align: center; }
 .composer { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; }
