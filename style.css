@@ -166,6 +166,8 @@ body.locked { overflow: hidden; }
 .fu-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .fu-chip { border: 1px solid var(--border-strong); background: rgba(255, 255, 255, 0.06); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left; }
 .fu-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+.fu--old { margin-top: 8px; }
+.fu-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 
 /* Phone: a bigger question box on its own row, with Combine family above the full-width Send button. */
 @media (max-width: 600px) {

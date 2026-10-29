@@ -421,6 +421,13 @@ if (window.visualViewport) {
 let detailTab = 'ask';       // last of ask / check / chart that was open
 let selectedId = '';         // the person the tabs work on, remembered on this device
 let pickTab = '';            // a tab was tapped with nobody chosen: the Person list then asks "whose chart?"
+// Suggested questions a person did not ask stay in the chat under the answer they came with, still tappable. Kept for this visit only.
+const leftovers = new Map();
+const leftKey = (kundliId, askedAt) => `${kundliId}|${askedAt || 'start'}`;
+const fuBlock = (curiosity, sugg, old) => `<div class="fu${old ? ' fu--old' : ''}">${curiosity ? `<p>${esc(curiosity)}</p>` : ''}<div class="fu-chips">${sugg.map((t) => `<button type="button" class="fu-chip" aria-pressed="false">${esc(t)}</button>`).join('')}</div></div>`;
+const leftoverHtml = (kundliId, askedAt) => { const r = leftovers.get(leftKey(kundliId, askedAt)); return r && r.length ? fuBlock('More to ask:', r, true) : ''; };
+const threadHtml = (kundliId, hist, hint) => (hist.length ? leftoverHtml(kundliId, '') + [...hist].reverse().map((e) => answerHtml(e) + leftoverHtml(kundliId, e.askedAt)).join('') : hint);
+
 let knownIds = [];           // people from the last list load, to check selectedId against
 let detailId = '';           // the person whose screen is showing now, empty on the list
 const SELECTED_KEY = 'ssa_kundli_selected';
@@ -466,6 +473,8 @@ async function renderDetail(kundliId) {
   onLangChange = null;
   detailId = kundliId;
   chooseId(kundliId);
+  // A person added just now is not in the list loaded earlier; without this the tab bar thinks nobody is chosen (or picks the only older person).
+  if (!knownIds.includes(kundliId)) knownIds = [...knownIds, kundliId];
   if (!['ask', 'check', 'chart'].includes(detailTab)) detailTab = 'ask';
 
   app.innerHTML = `<div class="wrap wrap--tabs">
@@ -480,7 +489,7 @@ async function renderDetail(kundliId) {
     <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
       <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button>${canSpeak ? `<button class="btn-secondary btn-small" id="voiceOn" aria-pressed="${autoRead()}" title="Read new answers aloud">&#128266;<span class="lg"> Voice</span></button>` : ''}<button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small chat-change" id="chatChange">Change</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
-      <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
+      <div class="thread" id="thread" aria-live="polite">${threadHtml(kundliId, hist, hintHtml())}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
       <form class="composer" id="askForm">
@@ -549,6 +558,9 @@ async function renderDetail(kundliId) {
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
   let voiceAsked = false, speakNext = false, askedNow = false, speakingFor = '';
+  // Suggestions left unasked by the question now being answered; kept under their answer once it arrives.
+  let pendingLeft = null;
+  const commitLeft = () => { if (pendingLeft) leftovers.set(pendingLeft.key, pendingLeft.rest); pendingLeft = null; };
   const toBottom = () => {
     const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
     // scrollIntoView moves the chat box and the page together; on a phone the page itself had been left scrolled down at the composer.
@@ -578,7 +590,7 @@ async function renderDetail(kundliId) {
   const refreshLanguage = async () => {
     const codes = needLabels();
     if (codes.length) await fetchLabels(codes);
-    thread.innerHTML = hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml();
+    thread.innerHTML = threadHtml(k.kundliId, hist, hintHtml());
     clearBtn.hidden = !hist.length;
     toBottom();
     renderFollowUps();
@@ -640,9 +652,8 @@ async function renderDetail(kundliId) {
   // Shown in the chat when the personal opening cannot be prepared, so a new person still has questions to tap.
   const FALLBACK = { curiosity: 'Not sure what to ask? Tap any question below, or type your own.', suggestions: ["Will I get a promotion this year?", "How will my business perform this year?", "How is my health expected to be?", "How will my married life be?", "When is a good time to change my job?", "Will I have financial gains this year?", "When will I get married?", "Is this a good time to buy a house or property?"].slice(0, 4) };
   let starter = null;
-  const fuHtml = (curiosity, sugg) => `<div class="fu"><p>${esc(curiosity)}</p><div class="fu-chips">${sugg.map((t) => `<button type="button" class="fu-chip">${esc(t)}</button>`).join('')}</div></div>`;
   const renderFollowUps = async () => {
-    thread.querySelectorAll('.fu').forEach((n) => n.remove());
+    thread.querySelectorAll('.fu:not(.fu--old)').forEach((n) => n.remove());
     const a = hist[0] && hist[0].answer;
     let data = a && a.curiosity && Array.isArray(a.suggestions) && a.suggestions.length ? a : null;
     if (!hist.length) {
@@ -650,18 +661,21 @@ async function renderDetail(kundliId) {
       data = starter;
     }
     if (!data || (!a && hist.length)) return;
-    thread.querySelectorAll('.fu').forEach((n) => n.remove());
-    thread.insertAdjacentHTML('beforeend', fuHtml(data.curiosity, data.suggestions));
+    thread.querySelectorAll('.fu:not(.fu--old)').forEach((n) => n.remove());
+    thread.insertAdjacentHTML('beforeend', fuBlock(data.curiosity, data.suggestions, false));
     toBottom();
   };
   thread.addEventListener('click', (e) => {
     const chip = e.target.closest('.fu-chip');
     if (!chip) return;
-    // The suggestion goes into the question box for the person to edit and send; it is not asked for them.
-    qBox.value = chip.textContent; grow();
+    // Suggestions are added to the question box for the person to edit and send; tapping several joins them, tapping one again takes it out.
+    const t = chip.textContent;
+    qBox.value = qBox.value.includes(t) ? qBox.value.replace(t, '').replace(/\s{2,}/g, ' ').trim() : `${qBox.value.trim()} ${t}`.trim();
+    grow(); syncChips();
     qBox.focus(); qBox.setSelectionRange(qBox.value.length, qBox.value.length);
   });
-  document.getElementById('askForm').addEventListener('submit', () => thread.querySelectorAll('.fu').forEach((n) => n.remove()));
+  const syncChips = () => thread.querySelectorAll('.fu-chip').forEach((c) => c.setAttribute('aria-pressed', String(qBox.value.includes(c.textContent))));
+  qBox.addEventListener('input', syncChips);
   renderFollowUps();
 
   qBox.addEventListener('keydown', (e) => {
@@ -712,7 +726,7 @@ async function renderDetail(kundliId) {
         const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined, place }));
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
         if (!out) return;
-        hist.unshift(out.entry); landOnAnswer = true;
+        commitLeft(); hist.unshift(out.entry); landOnAnswer = true;
         await refreshLanguage();
       } catch (err) {
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
@@ -738,6 +752,9 @@ async function renderDetail(kundliId) {
     stopSpeech();
     if (!question || sendBtn.disabled) return;
     sendBtn.disabled = true;
+    const block = thread.querySelector('.fu:not(.fu--old)');
+    const rest = block ? [...block.querySelectorAll('.fu-chip')].map((c) => c.textContent).filter((t) => !question.includes(t)) : [];
+    pendingLeft = rest.length ? { key: leftKey(k.kundliId, hist[0] && hist[0].askedAt), rest } : null;
     thread.querySelector('.hint')?.remove();
     thread.insertAdjacentHTML('beforeend', `<div class="msg msg--me pending"><p>${esc(question)}</p></div><div class="msg msg--pandit typing"><p class="muted">CosmicMath is studying the chart&hellip;</p></div>`);
     qBox.value = ''; grow(); landOnAnswer = false;
@@ -759,7 +776,7 @@ async function renderDetail(kundliId) {
       const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined, place }));
       dropPending();
       if (!out) return;
-      hist.unshift(out.entry); landOnAnswer = true;
+      commitLeft(); hist.unshift(out.entry); landOnAnswer = true;
       await refreshLanguage();
     } catch (err) {
       dropPending();
@@ -1244,6 +1261,8 @@ function openModal(k, done) {
       if (!out) { close(); return; }
       close();
       // A new kundli without a birth time goes straight to finding it; an edit only does when no time has been settled yet.
+      // A new person opens on Ask so the chat carries on from there.
+      if (!isEdit) { detailTab = 'ask'; pickTab = ''; }
       if (fd.get('timeUnknown') === 'on' && (!isEdit || k?.rectification?.status !== 'applied')) { openRectify(out.kundliId); return; }
       if (isEdit) done(); else renderDetail(out.kundliId);
     } catch (err) {
