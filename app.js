@@ -5,7 +5,7 @@
  * as frontend/form/. The server scopes every call to the verified email, so
  * nothing here can reach another person's data.
  */
-import { canListen, canSpeak, createMic, speak, speechText, stopSpeech, unlockSpeech } from './voice.js';
+import { autoRead, canListen, canSpeak, createMic, isSpeaking, setAutoRead, speak, speechText, stopSpeech, unlockSpeech } from './voice.js';
 
 const API_URL = 'https://jxybttdluexpbwsjzney.supabase.co/functions/v1/api';
 const GOOGLE_CLIENT_ID = '741282599231-qcp7doaqr32vd44eue2lrp6utijpa3s2.apps.googleusercontent.com';
@@ -479,7 +479,7 @@ async function renderDetail(kundliId) {
 
     <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
-      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button><button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small chat-change" id="chatChange">Change</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
+      <div class="top"><h2 style="margin:0;"><span class="chat-title-wide">Ask CosmicMath</span><span class="chat-title-name">${esc(k.name)}</span></h2><div class="tools"><button class="btn-secondary btn-small" id="langTop">Language</button>${canSpeak ? `<button class="btn-secondary btn-small" id="voiceOn" aria-pressed="${autoRead()}" title="Read new answers aloud">&#128266;<span class="lg"> Voice</span></button>` : ''}<button class="btn-secondary btn-small" id="clear" ${hist.length ? '' : 'hidden'}>Clear chat</button><button class="btn-secondary btn-small chat-change" id="chatChange">Change</button><button class="btn-secondary btn-small" id="full" aria-pressed="false">Full<span class="lg"> screen</span></button></div></div>
       <div class="thread" id="thread" aria-live="polite">${hist.length ? [...hist].reverse().map(answerHtml).join('') : hintHtml()}</div>
       <p class="muted" id="langStatus" hidden></p>
       <p class="error" id="askErr" hidden></p>
@@ -548,7 +548,7 @@ async function renderDetail(kundliId) {
   sendBtn.addEventListener('pointerdown', (e) => { if (document.activeElement === qBox) e.preventDefault(); });
   // A fresh answer is brought to its top, so the person reads it from the start instead of scrolling back up from the bottom.
   let landOnAnswer = false;
-  let voiceAsked = false, speakNext = false;
+  let voiceAsked = false, speakNext = false, askedNow = false;
   const toBottom = () => {
     const latest = landOnAnswer && [...thread.querySelectorAll('.ans')].pop();
     // scrollIntoView moves the chat box and the page together; on a phone the page itself had been left scrolled down at the composer.
@@ -583,7 +583,7 @@ async function renderDetail(kundliId) {
     toBottom();
     renderFollowUps();
     // A question asked by voice is answered by voice.
-    if (speakNext && hist[0]) { speakNext = false; speak(speechText(hist[0]), hist[0].lang || lang); }
+    if ((speakNext || (autoRead() && askedNow)) && hist[0]) { askedNow = false; speakNext = false; speak(speechText(hist[0]), hist[0].lang || lang); }
   };
   // Picking a language only affects new questions; fetch its headings now so the next answer shows at once.
   onLangChange = () => { if (lang && lang !== 'en' && !labelCache.has(lang)) fetchLabels([lang]); };
@@ -615,7 +615,7 @@ async function renderDetail(kundliId) {
     const sp = ev.target.closest('[data-speak]');
     if (!sp) return;
     unlockSpeech();
-    if (speechSynthesis.speaking) { stopSpeech(); return; }
+    if (isSpeaking()) { stopSpeech(); return; }
     const entry = hist.find((x) => x.askedAt === sp.dataset.speak);
     if (entry) speak(speechText(entry), entry.lang || lang);
   });
@@ -667,6 +667,8 @@ async function renderDetail(kundliId) {
     if (e.key === 'Enter' && !e.shiftKey && !window.matchMedia('(pointer: coarse)').matches) { e.preventDefault(); document.getElementById('askForm').requestSubmit(); }
   });
   // Mic: tap, speak, and the question is sent when you stop talking; the answer is then read aloud.
+  const voiceBtn = document.getElementById('voiceOn');
+  voiceBtn?.addEventListener('click', () => { const on = !autoRead(); setAutoRead(on); voiceBtn.setAttribute('aria-pressed', String(on)); if (on) unlockSpeech(); else stopSpeech(); });
   const micBtn = document.getElementById('mic');
   if (micBtn) {
     const mic = createMic({
@@ -730,7 +732,7 @@ async function renderDetail(kundliId) {
     const question = qBox.value.trim();
     const errEl = document.getElementById('askErr');
     errEl.hidden = true;
-    speakNext = voiceAsked; voiceAsked = false;
+    speakNext = voiceAsked; voiceAsked = false; askedNow = true;
     stopSpeech();
     if (!question || sendBtn.disabled) return;
     sendBtn.disabled = true;
@@ -927,7 +929,7 @@ function answerHtml(e) {
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
     <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
-      ${canSpeak ? `<button type="button" class="btn-link del" data-speak="${esc(e.askedAt)}">&#128266; Listen</button> ` : ''}<button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div>
+      <div class="msg-actions">${canSpeak ? `<button type="button" class="btn-link del" data-speak="${esc(e.askedAt)}">&#128266; Listen</button>` : '<span></span>'}<button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div></div>
   </div>`;
 }
 

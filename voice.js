@@ -29,8 +29,15 @@ export function unlockSpeech() {
   u.volume = 0;
   speechSynthesis.speak(u);
 }
-export const stopSpeech = () => { if (canSpeak) speechSynthesis.cancel(); };
-export const isSpeaking = () => canSpeak && speechSynthesis.speaking;
+// Own flag, not speechSynthesis.speaking: the silent unlock utterance also counts as speaking, which made the first Listen tap read as Stop.
+let talking = false;
+export const stopSpeech = () => { talking = false; if (canSpeak) speechSynthesis.cancel(); };
+export const isSpeaking = () => talking;
+
+// Remembered per device; on by default so every new answer is read out.
+const AUTO_KEY = 'kundliVoiceReplies';
+export const autoRead = () => { try { return localStorage.getItem(AUTO_KEY) !== '0'; } catch { return true; } };
+export const setAutoRead = (on) => { try { localStorage.setItem(AUTO_KEY, on ? '1' : '0'); } catch { /* ignore */ } };
 
 // Chrome cuts a long utterance off after ~15 s, so the answer is spoken a sentence group at a time.
 function chunks(text, max = 160) {
@@ -47,12 +54,14 @@ export function speak(text, langCode) {
   return new Promise((resolve) => {
     if (!canSpeak || !text) return resolve();
     speechSynthesis.cancel();
+    talking = true;
     const lang = bcp(langCode);
     const voice = pickVoice(lang);
     const list = chunks(text);
     let i = 0;
     const next = () => {
-      if (i >= list.length) return resolve();
+      if (!talking) return resolve();
+      if (i >= list.length) { talking = false; return resolve(); }
       const t = list[i++];
       const u = new SpeechSynthesisUtterance(t);
       u.lang = voice ? voice.lang : lang;
@@ -61,10 +70,11 @@ export function speak(text, langCode) {
       // Chrome sometimes never fires onend; without this the reply would stay "speaking" for ever.
       const dog = setTimeout(() => { speechSynthesis.cancel(); next(); }, 4000 + t.length * 120);
       u.onend = () => { clearTimeout(dog); next(); };
-      u.onerror = () => { clearTimeout(dog); resolve(); };
+      u.onerror = () => { clearTimeout(dog); talking = false; resolve(); };
       speechSynthesis.speak(u);
     };
-    next();
+    // Chrome drops a speak() issued in the same tick as cancel(), so the first sentence waits a moment.
+    setTimeout(next, 120);
   });
 }
 
