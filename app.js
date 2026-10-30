@@ -689,11 +689,17 @@ async function renderDetail(kundliId) {
     o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
     const topics = ideasFor(hist.map((x) => x.question));
     o.innerHTML = `<div class="panel" style="max-width:520px;width:100%;margin-top:24px;"><h2>Questions you can ask</h2>
+      <p class="muted" id="quotaLine" aria-live="polite"></p>
       <p class="muted">Tap a question to put it in the question box; tap several to ask them together. Questions you have asked are replaced by new ones.</p>
       <div class="ideas">${topics.map(([topic, list], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(topic)}</summary><div class="fu-chips">${list.map((q) => `<button type="button" class="fu-chip" aria-pressed="false">${esc(q)}</button>`).join('')}</div></details>`).join('')}</div>
       <div class="actions" style="margin-top:12px;"><button type="button" class="btn-primary" id="ideasDone">Done</button></div></div>`;
     document.body.appendChild(o);
     syncChips(o);
+    // Best effort: the panel is useful without the count, and the server still enforces the limit.
+    call('kundliPublic_quota').then((q) => {
+      const line = o.querySelector('#quotaLine');
+      if (line) line.innerHTML = `Questions left today: <b>${q.remaining}</b> of ${q.limit}`;
+    }).catch(() => {});
     o.querySelector('#ideasDone').addEventListener('click', () => o.remove());
     o.addEventListener('click', (e) => { if (e.target === o) o.remove(); });
     o.querySelector('.ideas').addEventListener('click', (e) => { const chip = e.target.closest('.fu-chip'); if (chip) { toggleAsk(chip.textContent); syncChips(o); } });
