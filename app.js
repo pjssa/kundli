@@ -445,7 +445,7 @@ const tabBarHtml = (active) => `<nav class="tabbar" aria-label="Sections">${TABS
 // The chat's full-screen lock must only hold while the chat itself is showing, or the other tabs could not scroll.
 function syncLock() {
   const c = document.getElementById('chat');
-  document.body.classList.toggle('locked', !!c && c.classList.contains('full') && (!window.matchMedia('(max-width: 899px)').matches || detailTab === 'ask'));
+  document.body.classList.toggle('locked', !!c && c.classList.contains('full') && (!true || detailTab === 'ask'));
 }
 function showTab(id) {
   detailTab = id;
@@ -508,7 +508,7 @@ async function renderDetail(kundliId) {
     </div>
 
     <div class="pane" data-pane="chart">
-    <div class="panel"><details ${window.matchMedia('(max-width: 899px)').matches ? 'open' : ''}><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
+    <div class="panel"><details ${true ? 'open' : ''}><summary>Birth chart</summary>${southChartHtml(chart)}<div class="table-scroll">${planetTableHtml(chart)}</div></details></div>
     </div>
     <div class="pane" data-pane="person">${footerHtml()}</div>
     ${tabBarHtml(detailTab)}
@@ -548,10 +548,10 @@ async function renderDetail(kundliId) {
   const clearBtn = document.getElementById('clear');
   const qBox = document.getElementById('q');
   // A one-line box on a phone cannot hold the long example.
-  if (window.matchMedia('(max-width: 899px)').matches) qBox.placeholder = 'Ask anything\u2026';
+  if (true) qBox.placeholder = 'Ask anything\u2026';
   const sendBtn = document.getElementById('send');
   // While typing on a phone the keyboard owns the bottom of the screen: the tab bar steps aside and only the message box stays above the keyboard.
-  const setTyping = (on) => document.body.classList.toggle('typing', on && window.matchMedia('(max-width: 899px)').matches);
+  const setTyping = (on) => document.body.classList.toggle('typing', on && true);
   qBox.addEventListener('focus', () => setTyping(true));
   qBox.addEventListener('blur', () => setTyping(false));
   // Tapping Send does not move focus mid-tap, so the layout does not jump under the finger; the box is released after the send (see submit).
@@ -627,7 +627,7 @@ async function renderDetail(kundliId) {
   };
   // On phones and tablets the chat is always full screen, WhatsApp style, with the tab bar kept below it. Wide screens keep the remembered choice.
   let startFull = true;
-  try { if (!window.matchMedia('(max-width: 899px)').matches) startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
+  try { if (!true) startFull = localStorage.getItem(FULL_KEY) !== '0'; } catch { /* default to full screen */ }
   if (startFull) setFull(true);
   document.addEventListener('keydown', onEsc);
   thread.addEventListener('click', (ev) => {

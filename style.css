@@ -112,14 +112,6 @@ body.locked { overflow: hidden; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex: none; }
 .avatar--initial { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 600; }
 
-/* Desktop: use the whole screen instead of a narrow centred column. Phones and tablets keep the compact layout above. */
-@media (min-width: 1000px) {
-  .wrap { max-width: none; padding: 24px clamp(32px, 4vw, 72px) 56px; }
-  .tiles { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-  .thread { max-height: none; height: clamp(420px, calc(100vh - 380px), 900px); }
-  .msg { max-width: min(78%, 900px); }
-  .chart { max-width: 520px; }
-}
 
 /* The Started and Changes lines under Current period are reference detail: small and grey. */
 .msg p.pline b { color: var(--ink-muted); }
@@ -260,7 +252,7 @@ body.locked { overflow: hidden; }
 
 /* Bottom tab bar on a person's screen. Phones and tablets only: wide screens show every pane and no bar. */
 .tabbar { display: none; }
-@media (max-width: 899px) {
+@media all {
   :root { --tabbar-h: 62px; }
   .wrap--tabs { padding-bottom: calc(var(--tabbar-h) + 28px + env(safe-area-inset-bottom)); }
   .pane--off { display: none; }
@@ -277,7 +269,7 @@ body.locked { overflow: hidden; }
 .change-person { display: none; }
 .tile-actions { display: flex; gap: 8px; margin-top: 8px; }
 .pick-prompt { margin: 6px 0; padding: 10px 12px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; font-size: 15px; }
-@media (max-width: 899px) {
+@media all {
   #back { display: none; }
   .change-person { display: inline-flex; align-items: center; }
 }
@@ -285,12 +277,12 @@ body.locked { overflow: hidden; }
 /* On the tabs only the name shows; Edit, Delete, the me tick, birth details and the birth-time help live on the Person tab. */
 .tile--pick { padding: 16px; font-size: 17px; }
 .tile-note { display: block; margin-top: 8px; font-size: 13px; color: var(--ink-muted); }
-@media (max-width: 899px) { .born-line, .timebanner { display: none; } }
+@media all { .born-line, .timebanner { display: none; } }
 
 /* Phones and tablets: the Ask tab is a full-screen, WhatsApp-style chat, name and Clear chat on top, composer on the bottom,
    with the tab bar kept under it. No boxes. Wide screens keep the boxed chat. */
 .chat-title-name { display: none; }
-@media (max-width: 899px) {
+@media all {
   .chat-title-wide, #langTop, #full { display: none; }
   .chat-title-name { display: inline; }
   .wrap--tabs .chat.full { bottom: calc(var(--kb, 0px) + var(--tabbar-h) + env(safe-area-inset-bottom)); height: auto; background: #0B0D1F radial-gradient(circle at 20% 0%, #2a2560 0, #0B0D1F 60%); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 10px 12px 0; }
@@ -307,10 +299,10 @@ body.locked { overflow: hidden; }
 
 /* Change (pick another person) sits in the Ask header on phones and tablets only. */
 .chat-change { display: none; }
-@media (max-width: 899px) { .chat.full .chat-change { display: inline-flex; align-items: center; } }
+@media all { .chat.full .chat-change { display: inline-flex; align-items: center; } }
 
 /* While typing the tab bar hides behind the keyboard and the chat ends right at it, so only the message box shows. */
-@media (max-width: 899px) {
+@media all {
   body.typing .tabbar { display: none; }
   body.typing .wrap--tabs .chat.full { bottom: var(--kb, 0px); }
 }
@@ -335,7 +327,7 @@ body.locked { overflow: hidden; }
 @media (max-width: 600px) { .top--home h1 { font-size: 22px; } .top--home .btn-small { padding: 6px 10px; } }
 
 /* Home on phones and tablets: the Add a person / Feedback row stays at the bottom, above the tab bar, while the people and the forecast panel scroll. */
-@media (max-width: 899px) {
+@media all {
   .home-dock { position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 9; padding: 8px 16px 12px; background: linear-gradient(to top, #0B0D1F 78%, rgba(11, 13, 31, 0)); }
   .home-dock-inner { max-width: 728px; margin: 0 auto; }
   .home-dock .footer-actions { margin: 0; }
