@@ -340,3 +340,14 @@ body.locked { overflow: hidden; }
 .suit-field { flex: 1 1 180px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; opacity: .85; }
 .suit-field input { flex: none; width: 100%; }
 .suit-form .suit-go { align-self: flex-end; }
+
+/* Desktop: the phone layout, but spread across the whole screen instead of a narrow centred column. */
+@media (min-width: 1000px) {
+  .wrap { max-width: none; padding: 24px clamp(32px, 4vw, 72px) 56px; }
+  .wrap--tabs.wrap--home { padding-bottom: calc(var(--tabbar-h) + var(--dock-h, 170px) + 8px + env(safe-area-inset-bottom)); }
+  .home-dock { padding-left: clamp(32px, 4vw, 72px); padding-right: clamp(32px, 4vw, 72px); }
+  .home-dock-inner { max-width: none; }
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .msg { max-width: min(78%, 900px); }
+  .chart { max-width: 520px; }
+}
