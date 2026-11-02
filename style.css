@@ -307,7 +307,7 @@ body.locked { overflow: hidden; }
   body.typing .wrap--tabs .chat.full { bottom: var(--kb, 0px); }
 }
 
-/* Home: a header with Language and Sign out together, compact two-row person tiles, a two-row forecast panel, and Add a person above Feedback. */
+/* Home: a header with Language and Sign out together, compact two-row person tiles, a two-row forecast panel, and Add a birth chart above Feedback. */
 .top-tools { display: flex; align-items: center; gap: 6px; flex: none; }
 .tile--compact { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 10px 12px; }
 .tile--compact .tile-name { margin: 0; overflow-wrap: anywhere; }
@@ -326,7 +326,7 @@ body.locked { overflow: hidden; }
 .notify .error { margin: 6px 0 0; }
 @media (max-width: 600px) { .top--home h1 { font-size: 22px; } .top--home .btn-small { padding: 6px 10px; } }
 
-/* Home on phones and tablets: the Add a person / Feedback row stays at the bottom, above the tab bar, while the people and the forecast panel scroll. */
+/* Home on phones and tablets: the Add a birth chart / Feedback row stays at the bottom, above the tab bar, while the people and the forecast panel scroll. */
 @media all {
   .home-dock { position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 9; padding: 8px 16px 12px; background: linear-gradient(to top, #0B0D1F 78%, rgba(11, 13, 31, 0)); }
   .home-dock-inner { max-width: 728px; margin: 0 auto; }

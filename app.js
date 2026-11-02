@@ -342,13 +342,13 @@ async function renderList() {
     <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
     ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
-      : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a person&rdquo; to begin.</p></div>`}
+      : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
     ${pickMode ? '' : notifyPanelHtml(items.some((k) => k.isMine))}
-    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a person</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
+    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a birth chart</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
-  // On phones the Add a person / Feedback row is pinned above the tab bar; the list (forecast panel included) gets bottom room for exactly its height.
+  // On phones the Add a birth chart / Feedback row is pinned above the tab bar; the list (forecast panel included) gets bottom room for exactly its height.
   const dock = document.getElementById('homeDock');
   if (dock) {
     const wrapEl = app.querySelector('.wrap');
@@ -763,7 +763,7 @@ async function renderDetail(kundliId) {
       ${people.map((p) => `<label class="pick"><input type="checkbox" value="${esc(p.kundliId)}" ${p.kundliId === k.kundliId ? 'checked' : ''} /> ${esc(p.name)}</label>`).join('')}
       <p class="error" hidden></p>
       <div class="actions"><button type="button" class="btn-primary btn-small" data-go>Combine and answer</button><button type="button" class="btn-secondary btn-small" data-solo>Just ${esc(k.name)}</button></div>`
-      : `<p>For a family reading I need the other family members&rsquo; kundlis. Go back to Everyone, add them with Add a person, then ask again.</p>
+      : `<p>For a family reading I need the other family members&rsquo; kundlis. Go back to Everyone, add them with Add a birth chart, then ask again.</p>
       <div class="actions"><button type="button" class="btn-secondary btn-small" data-solo>Answer for ${esc(k.name)} only</button></div>`;
     thread.appendChild(box);
     toBottom();
