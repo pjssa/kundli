@@ -851,6 +851,7 @@ const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
   vastuTitle: 'Vastu for your chart', vastuSeat: 'Sitting direction', vastuKeepLight: 'Keep light and clean', muhurtaBest: 'Best time', muhurtaNone: 'No good day found in these days. Ask for a longer stretch.', muhurtaNow: 'Good times today',
   protTitle: 'Protection from nazar and negative energy', protWhy: 'Why you are open to it', protDasha: 'Your running period', protSteps: 'What to do (one remedy is enough)', protAvoid: 'Avoid', protRelief: 'When it eases', protNote: 'This is traditional guidance for peace of mind. It does not replace medical or professional help.',
+  muhurtaAsked: 'The days you asked about', muhurtaAvoid: 'Not a good day for this', muhurtaOutOfRange: 'I can only check from today up to two months ahead.', muhurtaOverall: 'The best days overall',
   fbAsk: 'Was this right about your past?', fbRight: 'Yes, right', fbPartly: 'Partly', fbWrong: 'No, wrong', fbThanks: 'Thank you. You said: {rating}',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemPriority: 'Priority', gemSupported: 'Supported period', gemMain: 'Main period', gemSub: 'Sub-period', gemNow: 'running now', gemStart: 'Best day to start', gemNotWith: 'Do not wear with', gemBasis: 'Why this rating', gemStarsNote: 'Stars show how strong the stone is for your chart. Priority is the order to wear them for your question.', gemNotWithNote: 'in the same hand or on the same chain', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
@@ -911,9 +912,14 @@ function muhurtaHtml(m, L = L_EN, P = '') {
   if (!m || !Array.isArray(m.bestDays)) return '';
   const lab = (k) => L[k] || L_EN[k];
   const dd = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
-  const days = m.bestDays.map((d) => `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b>${d.line ? ` <span class="${P}muh-why">${esc(d.line)}</span>` : ''}</p><ul>${d.windows.map((w) => `<li>${esc(w.from)} to ${esc(w.to)} <span class="${P}muh-why">${esc(w.slot)}</span></li>`).join('')}</ul></div>`).join('');
+  const days = m.bestDays.map((d) => `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b>${d.line ? ` <span class="${P}muh-why">${esc(d.line)}</span>` : ''}</p>${d.note ? `<p class="${P}muh-why">${esc(d.note)}</p>` : ''}<ul>${d.windows.map((w) => `<li>${esc(w.from)} to ${esc(w.to)} <span class="${P}muh-why">${esc(w.slot)}</span></li>`).join('')}</ul></div>`).join('');
   const now = Array.isArray(m.goodSlots) && m.goodSlots.length ? `<p><b>${esc(lab('muhurtaNow'))}</b></p><ul>${m.goodSlots.map((x) => `<li>${esc(x.from)} to ${esc(x.to)} <span class="${P}muh-why">${esc(x.name)}</span></li>`).join('')}</ul>` : '';
-  const body = m.activity === 'general' && now ? now : (days || `<p>${esc(lab('muhurtaNone'))}</p>`);
+  const asked = Array.isArray(m.askedDays) && m.askedDays.length
+    ? `<p><b>${esc(lab('muhurtaAsked'))}</b></p>${m.askedDays.map((d) => d.outOfRange
+      ? `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b> <span class="${P}muh-why">${esc(lab('muhurtaOutOfRange'))}</span></p></div>`
+      : `<div class="${P}muh-day"><p><b>${esc(dd(d.date))}</b>${d.line ? ` <span class="${P}muh-why">${esc(d.line)}</span>` : ''}</p>${d.note ? `<p class="${P}muh-why">${esc(d.note)}</p>` : ''}${d.ok ? `<ul>${d.windows.map((w) => `<li>${esc(w.from)} to ${esc(w.to)} <span class="${P}muh-why">${esc(w.slot)}</span></li>`).join('')}</ul>` : `<p>${esc(lab('muhurtaAvoid'))}: <span class="${P}muh-why">${esc(d.reasons.join(', '))}</span></p>`}</div>`).join('')}`
+    : '';
+  const body = m.activity === 'general' && now ? now : (asked + (asked && days ? `<p><b>${esc(lab('muhurtaOverall'))}</b></p>` : '') + (days || `<p>${esc(lab('muhurtaNone'))}</p>`));
   return `<h4 class="h--main">${esc(lab('muhurtaBest'))} · ${esc(m.label)}</h4><p class="${P}muh-why">${esc(m.place)}</p>${body}`;
 }
 
