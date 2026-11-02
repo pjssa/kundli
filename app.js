@@ -235,12 +235,10 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
-// Two rows: the title with its on/off button, then one line of text with the test button when it is on.
-function notifyPanelHtml(hasMine) {
-  return `<div class="panel notify" id="notifyPanel">
-    <div class="notify-row"><h2>Daily forecast at 7 am</h2><button class="btn-primary btn-small" id="notifyToggle" hidden></button></div>
-    <div class="notify-row notify-row--text"><p class="muted">${hasMine ? 'Your day ahead and next change.' : 'First tick &ldquo;This is me&rdquo; on your own chart.'} <span id="notifyStatus">Checking&hellip;</span></p><button class="btn-secondary btn-small" id="notifyTest" hidden>Send now</button></div>
-    <p class="error" id="notifyErr" hidden></p></div>`;
+// The daily forecast lives in the pinned bottom row: a compact on/off button beside Feedback, with one small line above it for the status,
+// Send now and any error. The ids are the ones wireNotifyPanel looks for.
+function notifyNoteHtml(hasMine) {
+  return `<div class="dock-note" id="notifyPanel"><span class="muted">Daily Forecast: ${hasMine ? '' : 'first tick &ldquo;This is me&rdquo; on your own chart. '}<span id="notifyStatus">Checking&hellip;</span></span><button class="btn-link" id="notifyTest" hidden>Send now</button><span class="error" id="notifyErr" hidden></span></div>`;
 }
 async function wireNotifyPanel() {
   const status = document.getElementById('notifyStatus'), btn = document.getElementById('notifyToggle'), test = document.getElementById('notifyTest'), err = document.getElementById('notifyErr');
@@ -250,7 +248,7 @@ async function wireNotifyPanel() {
     const st = await pushState().catch(() => ({ supported: false, reason: 'Could not check notifications on this device.', subscribed: false }));
     if (!st.supported) { status.textContent = st.reason; btn.hidden = true; test.hidden = true; return; }
     status.textContent = st.subscribed ? 'On.' : st.blocked ? 'Blocked in settings.' : 'Off.';
-    btn.hidden = false; btn.textContent = st.subscribed ? 'Turn off' : 'Turn on'; test.hidden = !st.subscribed;
+    btn.hidden = false; btn.textContent = st.subscribed ? 'Turn off Daily Forecast' : 'Turn on Daily Forecast'; test.hidden = !st.subscribed;
     btn.onclick = async () => {
       show(''); btn.disabled = true;
       try { if (st.subscribed) await disablePush(); else await enablePush(); } catch (e) { show(e.message); }
@@ -340,15 +338,14 @@ async function renderList() {
   const who = { email: me.email || prof.email || '', name: me.name || prof.name || '', picture: prof.email && me.email && prof.email !== me.email ? '' : (prof.picture || '') };
   app.innerHTML = `<div class="wrap wrap--tabs${pickMode ? '' : ' wrap--home'}">
     <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
-    ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<p class="muted">Add yourself and your family members, then ask CosmicMath about any of them.</p>'}
+    ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<div class="intro-row"><p class="muted">Add yourself and family, then ask CosmicMath about any of them.</p><button type="button" class="btn-primary btn-small" id="addBtn">+ Add a<br>birth chart</button></div>'}
     ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
-    ${pickMode ? '' : notifyPanelHtml(items.some((k) => k.isMine))}
-    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="addBtn">+ Add a birth chart</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
+    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner">${notifyNoteHtml(items.some((k) => k.isMine))}<div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle" hidden></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
-  // On phones the Add a birth chart / Feedback row is pinned above the tab bar; the list (forecast panel included) gets bottom room for exactly its height.
+  // On phones the forecast / Feedback row is pinned above the tab bar; the list (forecast panel included) gets bottom room for exactly its height.
   const dock = document.getElementById('homeDock');
   if (dock) {
     const wrapEl = app.querySelector('.wrap');
