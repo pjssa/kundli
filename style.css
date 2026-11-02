@@ -375,3 +375,15 @@ body.locked { overflow: hidden; }
 .bc-h { margin: 6px 0 2px; }
 .bc-list { margin: 0 0 6px; padding-left: 20px; }
 .bc-list li { margin: 2px 0; line-height: 1.4; }
+
+/* Company growth line */
+.growth { margin: 12px 0 4px; }
+.growth-pick { display: flex; align-items: center; gap: 8px; margin: 4px 0 6px; font-size: 14px; }
+.growth-sel { width: auto; min-height: 36px; }
+.growth-span svg { display: block; max-width: 420px; }
+.growth-span[hidden] { display: none; }
+
+/* Money and health trend under an answer */
+.trend { margin: 10px 0 4px; }
+.trend-h { margin: 0 0 2px; font-size: 14px; }
+.trend svg { display: block; max-width: 420px; }

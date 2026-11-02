@@ -533,7 +533,7 @@ async function renderDetail(kundliId) {
     go.disabled = true; go.textContent = 'Checking\u2026';
     try {
       const r = await guarded(() => call('kundliPublic_suitability', { kundliId: k.kundliId, kind, value: val, ...(kind === 'company' ? { incorporationDate: inc || undefined, incorporationPlace: form.querySelector('.suit-place').value.trim() || undefined } : {}) }));
-      if (r) { out.innerHTML = suitabilityHtml(r); out.hidden = false; }
+      if (r) { out.innerHTML = suitabilityHtml(r); wireGrowth(out); out.hidden = false; }
     } catch (ex) { err.textContent = ex.message; err.hidden = false; out.hidden = true; }
     go.disabled = false; go.textContent = 'Check';
   }));
@@ -1012,7 +1012,7 @@ function answerHtml(e) {
   const a = unquoteBlank(e.answer || {});
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
+    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${trendHtml(a.trend)}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
       ${feedbackHtml(e, L)}
       <div class="msg-actions">${canSpeak ? `<button type="button" class="btn-link del" data-speak="${esc(e.askedAt)}">&#128266; Listen</button>` : '<span></span>'}<button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div></div>
   </div>`;
@@ -1054,6 +1054,45 @@ function suitTileHtml([kind, title, blurb, label], k) {
       <div class="suit-out msg msg--pandit" hidden></div>
     </div>`;
 }
+// The line under a money or health answer, for the period asked: the server scores each point from the same rules as the verdict.
+// It is drawn small and plain on purpose: its ups and downs are the message, so the axis only says Low, Mid and High.
+function trendHtml(t) {
+  if (!t || !Array.isArray(t.points) || t.points.length < 3) return '';
+  const W = 320, H = 130, L = 34, R = 8, T = 8, B = 22, pw = W - L - R, ph = H - T - B;
+  const t0 = Date.parse(t.points[0][0]), t1 = Date.parse(t.points[t.points.length - 1][0]), span = Math.max(t1 - t0, 1);
+  const x = (ms) => L + (pw * (ms - t0)) / span, y = (v) => T + ph * (1 - v / 100);
+  const long = span > 2 * 365 * 86400000;
+  const lab = (ms) => { const d = new Date(ms); if (long) return String(d.getUTCFullYear()); return span < 200 * 86400000 ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : `${d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })} ${String(d.getUTCFullYear()).slice(2)}`; };
+  const grid = [[25, 'Low'], [50, 'Mid'], [75, 'High']].map(([v, n]) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" stroke-opacity=".18" /><text x="${L - 4}" y="${y(v) + 4}" text-anchor="end" font-size="9" fill="currentColor" fill-opacity=".7">${n}</text>`).join('');
+  const ticks = [0, 1, 2, 3].map((k) => { const ms = t0 + (span * k) / 3; return `<text x="${x(ms)}" y="${H - 7}" text-anchor="${k === 0 ? 'start' : k === 3 ? 'end' : 'middle'}" font-size="9" fill="currentColor" fill-opacity=".7">${lab(ms)}</text>`; }).join('');
+  const nowMs = Date.parse(t.now);
+  const now = nowMs >= t0 && nowMs <= t1 ? `<line x1="${x(nowMs)}" x2="${x(nowMs)}" y1="${T}" y2="${T + ph}" stroke="currentColor" stroke-dasharray="3 3" stroke-opacity=".6" /><text x="${x(nowMs) + 3}" y="${T + 9}" font-size="9" fill="currentColor">now</text>` : '';
+  const pts = t.points.map(([d, v]) => `${x(Date.parse(d)).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const cap = t.label ? t.label.charAt(0).toUpperCase() + t.label.slice(1) : '';
+  return `<div class="trend"><p class="trend-h"><b>${esc(cap)}</b> <span class="muted">${lab(t0)} to ${lab(t1)}</span></p><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(cap)} trend">${grid}${now}<polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" points="${pts}" />${ticks}</svg></div>`;
+}
+// The company growth line, five years at a time: a quarterly score drawn as a small SVG, with a picker for the five-year span.
+// Every span is drawn up front and the picker only shows one of them, so there is no state to keep.
+const growthSpans = (g) => { const out = []; for (let y = g.startYear; y <= g.startYear + Math.floor(g.points.length / 4) - 1; y += 5) out.push(y); return out; };
+function growthSvg(g, from) {
+  const W = 320, H = 150, L = 34, R = 8, T = 10, B = 24, pw = W - L - R, ph = H - T - B;
+  const pts = [];
+  for (let i = 0; i < 20; i++) { const v = g.points[(from - g.startYear) * 4 + i]; if (v != null) pts.push([L + (pw * i) / 19, T + ph * (1 - v / 100)]); }
+  const grid = [[25, 'Low'], [50, 'Mid'], [75, 'High']].map(([v, t]) => `<line x1="${L}" x2="${W - R}" y1="${T + ph * (1 - v / 100)}" y2="${T + ph * (1 - v / 100)}" stroke="currentColor" stroke-opacity=".18" /><text x="${L - 4}" y="${T + ph * (1 - v / 100) + 4}" text-anchor="end" font-size="9" fill="currentColor" fill-opacity=".7">${t}</text>`).join('');
+  const years = [0, 1, 2, 3, 4].map((k) => `<text x="${L + (pw * (k * 4)) / 19}" y="${H - 8}" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity=".7">${from + k}</text>`).join('');
+  const nowI = (g.nowYear - from) * 4 + Math.floor(new Date().getMonth() / 3);
+  const now = nowI >= 0 && nowI < 20 ? `<line x1="${L + (pw * nowI) / 19}" x2="${L + (pw * nowI) / 19}" y1="${T}" y2="${T + ph}" stroke="currentColor" stroke-dasharray="3 3" stroke-opacity=".6" /><text x="${L + (pw * nowI) / 19 + 3}" y="${T + 9}" font-size="9" fill="currentColor">now</text>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Company growth ${from} to ${from + 4}">${grid}${now}<polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" points="${pts.map((p) => p.join(',')).join(' ')}" />${years}</svg>`;
+}
+function growthHtml(g) {
+  const spans = growthSpans(g);
+  const cur = spans.filter((y) => y <= g.nowYear).pop() ?? spans[0];
+  return `<div class="growth"><p class="bc-sub">Growth over the years</p><label class="growth-pick">Years <select class="growth-sel">${spans.map((y) => `<option value="${y}"${y === cur ? ' selected' : ''}>${y} to ${y + 4}</option>`).join('')}</select></label>${spans.map((y) => `<div class="growth-span" data-from="${y}"${y === cur ? '' : ' hidden'}>${growthSvg(g, y)}</div>`).join('')}<p class="muted">A rough trend from the company's own periods and Saturn and Jupiter, to be read by its ups and downs, not as a figure.${g.uncertain ? ' The time of incorporation is unknown, so it can shift.' : ''}</p></div>`;
+}
+function wireGrowth(root) {
+  const sel = root.querySelector('.growth-sel');
+  if (sel) sel.addEventListener('change', () => root.querySelectorAll('.growth-span').forEach((d) => { d.hidden = d.dataset.from !== sel.value; }));
+}
 // One Benefits and one Cautions heading with a short list under each, instead of "Benefit:" and "Caution:" repeated on every line.
 const benCau = (o, max = 99) => {
   const part = (label, arr) => (arr && arr.length ? `<p class="bc-h"><b>${label}</b></p><ul class="bc-list">${arr.slice(0, max).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '');
@@ -1078,8 +1117,15 @@ function suitabilityHtml(r) {
     if (nm.found) lines.push(`<p>The name starts with <b>${esc(nm.sound)}</b>, in <b>${esc(nm.nakshatra)}</b> (${esc(nm.rashi)}, ruled by ${esc(nm.lord)}).</p>`);
     else lines.push(`<p>This first sound is not in the nakshatra naming table, so the name is read by its numbers only.</p>`);
     // A company reads long, so each group keeps its two most important points under one heading.
-    const sub = (title, o) => { const h = benCau(o, 2); if (h) lines.push(`<p class="bc-sub">${title}</p>${h}`); };
+    const sub = (title, o) => { const h = benCau(o, 2) || (o.note ? `<p class="muted">${esc(o.note)}</p>` : ''); if (h) lines.push(`<p class="bc-sub">${title}</p>${h}`); };
     sub('Name', nm); sub('You and the company', cc.owner); sub('This year', cc.transit);
+    // The company's own life periods, from its date of incorporation.
+    const lf = cc.lifetime;
+    if (lf && lf.periods.length) {
+      lines.push(`<p class="bc-sub">Lifetime</p><ul class="bc-list">${lf.periods.map((x) => `<li><b>${x.now ? 'Now' : 'Next'}: ${esc(x.lord)}, ${x.from} to ${x.to}.</b> ${esc(x.text)}.</li>`).join('')}</ul>`);
+      if (lf.note) lines.push(`<p class="muted">${esc(lf.note)}</p>`);
+    }
+    if (cc.growth && cc.growth.points.length >= 20) lines.push(growthHtml(cc.growth));
     if (nm.bestStarts && nm.bestStarts.length) lines.push(`<p>Best starting sounds for the company's nakshatra: <b>${esc(nm.bestStarts.join(', '))}</b></p>`);
   }
   // A personal name is judged first by its first sound: nakshatra, tara from the birth nakshatra, rashi and the nakshatra lord.
