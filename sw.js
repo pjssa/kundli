@@ -11,14 +11,27 @@ self.addEventListener('push', (event) => {
   }));
 });
 
+// A new version of this file takes over as soon as it has installed, so a fix reaches phones the next time the app is opened.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
+// Tapping a push. On an iPhone the app is brought up only by opening a window from inside this handler: finding the already-open (often
+// suspended) window and calling focus() can resolve without showing anything, which looked like "I tapped it and nothing happened".
+// So an iPhone always opens the page with ?daily=1 or ?sky=1, which shows the message in a popup after loading. Elsewhere an open app
+// gets the message at once and a closed one opens the same link; if focusing fails the link is opened instead.
+const isIos = /iPhone|iPad|iPod/i.test(self.navigator?.userAgent || '');
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const n = event.notification;
   const url = new URL(n.data?.url || '/', self.location.origin).href;
-  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (wins) => {
-    const open = wins.find((w) => w.url.startsWith(self.location.origin));
-    // An open app shows the message in a popup straight away; a closed one opens with ?daily=1 and does the same after loading.
-    if (open) { open.postMessage({ type: 'daily', title: n.title, body: n.body }); return open.focus(); }
-    return self.clients.openWindow(url);
-  }));
+  event.waitUntil((async () => {
+    if (!isIos) {
+      try {
+        const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const open = wins.find((w) => w.url.startsWith(self.location.origin));
+        if (open) { open.postMessage({ type: 'daily', title: n.title, body: n.body }); await open.focus(); return; }
+      } catch { /* open the link below instead */ }
+    }
+    await self.clients.openWindow(url);
+  })());
 });
