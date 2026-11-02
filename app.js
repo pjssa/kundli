@@ -1054,6 +1054,11 @@ function suitTileHtml([kind, title, blurb, label], k) {
       <div class="suit-out msg msg--pandit" hidden></div>
     </div>`;
 }
+// One Benefits and one Cautions heading with a short list under each, instead of "Benefit:" and "Caution:" repeated on every line.
+const benCau = (o, max = 99) => {
+  const part = (label, arr) => (arr && arr.length ? `<p class="bc-h"><b>${label}</b></p><ul class="bc-list">${arr.slice(0, max).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '');
+  return part('Benefits', o.benefits) + part('Cautions', o.cautions);
+};
 const SUIT_AREAS = [['health', 'Health'], ['wealth', 'Wealth'], ['relations', 'Relations']];
 const suitLine = (areas, list = SUIT_AREAS) => list.map(([k, label]) => `${label}: <b>${esc(areas[k])}</b>`).join(' &middot; ');
 function suitabilityHtml(r) {
@@ -1072,8 +1077,9 @@ function suitabilityHtml(r) {
     const nm = cc.name;
     if (nm.found) lines.push(`<p>The name starts with <b>${esc(nm.sound)}</b>, in <b>${esc(nm.nakshatra)}</b> (${esc(nm.rashi)}, ruled by ${esc(nm.lord)}).</p>`);
     else lines.push(`<p>This first sound is not in the nakshatra naming table, so the name is read by its numbers only.</p>`);
-    const add = (title, o) => { for (const t of o.benefits || []) lines.push(`<p><b>Benefit${title}:</b> ${esc(t)}</p>`); for (const t of o.cautions || []) lines.push(`<p><b>Caution${title}:</b> ${esc(t)}</p>`); };
-    add(' (name)', nm); add(' (you and the company)', cc.owner); add(' (this year)', cc.transit);
+    // A company reads long, so each group keeps its two most important points under one heading.
+    const sub = (title, o) => { const h = benCau(o, 2); if (h) lines.push(`<p class="bc-sub">${title}</p>${h}`); };
+    sub('Name', nm); sub('You and the company', cc.owner); sub('This year', cc.transit);
     if (nm.bestStarts && nm.bestStarts.length) lines.push(`<p>Best starting sounds for the company's nakshatra: <b>${esc(nm.bestStarts.join(', '))}</b></p>`);
   }
   // A personal name is judged first by its first sound: nakshatra, tara from the birth nakshatra, rashi and the nakshatra lord.
@@ -1083,16 +1089,14 @@ function suitabilityHtml(r) {
     if (nk.found) {
       lines.push(`<p>The name starts with <b>${esc(nk.sound)}</b>, in <b>${esc(nk.nakshatra)}</b> pada ${nk.pada} (${esc(nk.rashi)}, ruled by ${esc(nk.lord)}). Your birth nakshatra is ${esc(nk.birthNakshatra)}.</p>`);
       if (nk.alsoIn && nk.alsoIn.length) lines.push(`<p>This sound is also used in ${esc(nk.alsoIn.join(', '))}.</p>`);
-      for (const t of nk.benefits) lines.push(`<p><b>Benefit:</b> ${esc(t)}</p>`);
-      for (const t of nk.cautions) lines.push(`<p><b>Caution:</b> ${esc(t)}</p>`);
+      lines.push(benCau(nk));
     } else lines.push(`<p>This first sound is not in the nakshatra naming table, so only the number reading is used.</p>`);
     if (nk.bestStarts && nk.bestStarts.length) lines.push(`<p>Best starting sounds for your birth nakshatra (${esc(nk.birthNakshatra)}): <b>${esc(nk.bestStarts.join(', '))}</b></p>`);
   }
   // The Vedic reading behind the verdict: the planet this number stands for, where it sits in the chart, and what it gives and costs.
   for (const rd of c.readings || []) {
     lines.push(`<h4 class="h--main">${esc(rd.label)}: number ${rd.number}, ${esc(rd.planet)} (${esc(rd.overall)})</h4><p>${esc(rd.placement)}</p>`);
-    for (const t of rd.benefits) lines.push(`<p><b>Benefit:</b> ${esc(t)}</p>`);
-    for (const t of rd.cautions) lines.push(`<p><b>Caution:</b> ${esc(t)}</p>`);
+    lines.push(benCau(rd, r.kind === 'company' ? 2 : 99));
   }
   if (r.bestNumbers && r.bestNumbers.length) lines.push(`<p>Numbers that suit your chart best: <b>${esc(r.bestNumbers.map((b) => `${b.number} (${b.planet})`).join(', '))}</b></p>`);
   if (c.start) lines.push(`<p>Starting sound (${esc(c.start.nakshatra)} nakshatra): <b>${c.start.ok ? 'Matches' : 'Does not match'}</b>${c.start.ok ? '' : ` &middot; favoured starts: ${esc(c.start.starts.join(', '))}`}</p>`);

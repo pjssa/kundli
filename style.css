@@ -369,3 +369,9 @@ body.locked { overflow: hidden; }
 .fb-btn.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .fb-btn:disabled { opacity: 0.6; cursor: default; }
 .fb-thanks { width: 100%; color: var(--ink-muted); font-size: 12px; }
+
+/* Benefits and Cautions lists in the name, mobile and company checks */
+.bc-sub { margin: 12px 0 2px; font-weight: 600; color: var(--accent-ink); }
+.bc-h { margin: 6px 0 2px; }
+.bc-list { margin: 0 0 6px; padding-left: 20px; }
+.bc-list li { margin: 2px 0; line-height: 1.4; }
