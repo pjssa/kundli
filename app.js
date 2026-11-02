@@ -311,6 +311,13 @@ async function openDailyFromLink() {
   try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
   try { showDailyPopup(await call('kundliPublic_dailyForecast')); } catch (err) { showDailyPopup({ title: 'Daily forecast', body: err.message }); }
 }
+// The Amavasya, Purnima and grahan reminder opens the same popup with the next such day for the person's own chart.
+let pendingSky = new URLSearchParams(location.search).has('sky');
+async function openSkyFromLink() {
+  pendingSky = false;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
+  try { showDailyPopup(await call('kundliPublic_skyEvents')); } catch (err) { showDailyPopup({ title: 'Amavasya, Purnima and grahan', body: err.message }); }
+}
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'daily') showDailyPopup(e.data); });
 
 async function renderList() {
@@ -357,6 +364,7 @@ async function renderList() {
   wireNotifyPanel();
   askWhichIsMine(items);
   if (pendingDaily) openDailyFromLink();
+  if (pendingSky) openSkyFromLink();
   document.getElementById('addBtn')?.addEventListener('click', () => openModal(null, renderList));
   // The tick sits on the tile so nobody has to open a chart to mark it; it must not also open the chart.
   app.querySelectorAll('[data-mine]').forEach((box) => {
