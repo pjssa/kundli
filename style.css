@@ -351,3 +351,11 @@ body.locked { overflow: hidden; }
   .msg { max-width: min(78%, 900px); }
   .chart { max-width: 520px; }
 }
+
+/* "Was this right?" row under an answer about the past */
+.fb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
+.fb-q { width: 100%; color: var(--ink-muted); }
+.fb-btn { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.fb-btn.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.fb-btn:disabled { opacity: 0.6; cursor: default; }
+.fb-thanks { width: 100%; color: var(--ink-muted); font-size: 12px; }

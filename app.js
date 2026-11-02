@@ -639,6 +639,19 @@ async function renderDetail(kundliId) {
     if (entry) readOut(entry);
   });
   thread.addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-fb]');
+    if (!b) return;
+    const e = hist.find((x) => x.askedAt === b.dataset.at);
+    if (!e) return;
+    const row = b.closest('.fb');
+    row.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+    try {
+      await guarded(() => call('kundliPublic_answerFeedback', { kundliId: k.kundliId, askedAt: e.askedAt, rating: b.dataset.fb }));
+      e.feedback = b.dataset.fb;
+      row.outerHTML = feedbackHtml(e, (e.lang && labelCache.get(e.lang)) || L_EN);
+    } catch (err) { alert(err.message); row.querySelectorAll('button').forEach((x) => { x.disabled = false; }); }
+  });
+  thread.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('[data-del]');
     if (!btn || !window.confirm('Delete this question and its answer?')) return;
     btn.disabled = true;
@@ -838,6 +851,7 @@ const L_EN = {
   why: 'Why', period: 'Current period', started: 'Started', changes: 'Changes', bestTimings: 'Favourable window', highestChances: 'The highest chances for this matter are from {from} to {to}.', goodChances: 'There are also good chances from {from} to {to}.',
   vastuTitle: 'Vastu for your chart', vastuSeat: 'Sitting direction', vastuKeepLight: 'Keep light and clean', muhurtaBest: 'Best time', muhurtaNone: 'No good day found in these days. Ask for a longer stretch.', muhurtaNow: 'Good times today',
   protTitle: 'Protection from nazar and negative energy', protWhy: 'Why you are open to it', protDasha: 'Your running period', protSteps: 'What to do (one remedy is enough)', protAvoid: 'Avoid', protRelief: 'When it eases', protNote: 'This is traditional guidance for peace of mind. It does not replace medical or professional help.',
+  fbAsk: 'Was this right about your past?', fbRight: 'Yes, right', fbPartly: 'Partly', fbWrong: 'No, wrong', fbThanks: 'Thank you. You said: {rating}',
   approxNote: 'Approximate windows. They depend on the exact birth time and are not a guarantee.', remedy: 'Remedy', gemPriority: 'Priority', gemSupported: 'Supported period', gemMain: 'Main period', gemSub: 'Sub-period', gemNow: 'running now', gemStart: 'Best day to start', gemNotWith: 'Do not wear with', gemBasis: 'Why this rating', gemStarsNote: 'Stars show how strong the stone is for your chart. Priority is the order to wear them for your question.', gemNotWithNote: 'in the same hand or on the same chain', gemstone: 'Gemstone', gemAvoid: 'Not advised', gemGraha: 'Graha', gemHouse: 'House', gemPeriod: 'Period', gemBenefits: 'Benefits', gemHow: 'How to wear', gemWhen: 'When to wear', gemFinger: 'Finger', gemMetal: 'Metal', gemMantra: 'Mantra', gemDonation: 'Donation', gemDay: 'Day', disclaimer: 'This is a prediction, not a guarantee.',
 };
 let lang = (() => { try { return localStorage.getItem('kundliLang') || 'en'; } catch { return 'en'; } })();
@@ -973,12 +987,22 @@ function isoFromDmy(v) {
   return dt.getUTCFullYear() === +m[3] && dt.getUTCMonth() === +m[2] - 1 && dt.getUTCDate() === +m[1] ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
+// "Was this right?" on an answer about the past: three taps, kept with the answer. The verdict behind it stays on the server.
+const FB_RATINGS = [['right', 'fbRight'], ['partly', 'fbPartly'], ['wrong', 'fbWrong']];
+function feedbackHtml(e, L) {
+  if (!e.canRate) return '';
+  const t = (k) => L[k] || L_EN[k];
+  const name = Object.fromEntries(FB_RATINGS.map(([r, k]) => [r, t(k)]));
+  return `<div class="fb"><span class="fb-q">${esc(t('fbAsk'))}</span>${FB_RATINGS.map(([r]) => `<button type="button" class="fb-btn${e.feedback === r ? ' is-on' : ''}" data-fb="${r}" data-at="${esc(e.askedAt)}">${esc(name[r])}</button>`).join('')}${e.feedback ? `<span class="fb-thanks">${esc(t('fbThanks').replace('{rating}', name[e.feedback]))}</span>` : ''}</div>`;
+}
+
 function answerHtml(e) {
   const L = (e.lang && labelCache.get(e.lang)) || L_EN;
   const a = unquoteBlank(e.answer || {});
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
     <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
+      ${feedbackHtml(e, L)}
       <div class="msg-actions">${canSpeak ? `<button type="button" class="btn-link del" data-speak="${esc(e.askedAt)}">&#128266; Listen</button>` : '<span></span>'}<button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div></div>
   </div>`;
 }
