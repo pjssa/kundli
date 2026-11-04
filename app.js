@@ -1058,18 +1058,26 @@ function suitTileHtml([kind, title, blurb, label], k) {
 // It is drawn small and plain on purpose: its ups and downs are the message, so the axis only says Low, Mid and High.
 function trendHtml(t) {
   if (!t || !Array.isArray(t.points) || t.points.length < 3) return '';
-  const W = 320, H = 130, L = 34, R = 8, T = 8, B = 22, pw = W - L - R, ph = H - T - B;
+  const W = 320, H = 150, L = 38, R = 10, T = 12, B = 24, pw = W - L - R, ph = H - T - B;
   const t0 = Date.parse(t.points[0][0]), t1 = Date.parse(t.points[t.points.length - 1][0]), span = Math.max(t1 - t0, 1);
   const x = (ms) => L + (pw * (ms - t0)) / span, y = (v) => T + ph * (1 - v / 100);
   const long = span > 2 * 365 * 86400000;
   const lab = (ms) => { const d = new Date(ms); if (long) return String(d.getUTCFullYear()); return span < 200 * 86400000 ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : `${d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })} ${String(d.getUTCFullYear()).slice(2)}`; };
-  const grid = [[25, 'Low'], [50, 'Mid'], [75, 'High']].map(([v, n]) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" stroke-opacity=".18" /><text x="${L - 4}" y="${y(v) + 4}" text-anchor="end" font-size="9" fill="currentColor" fill-opacity=".7">${n}</text>`).join('');
+  // Three tinted bands (the same cut-offs as the verdict phases) so the level reads at a glance in light and dark; the line stays in the accent colour.
+  const bands = [[100, 65, '#3E9B6B', 'High'], [65, 35, '#D9A23B', 'Mid'], [35, 0, '#D2574F', 'Low']].map(([hi, lo, c, n]) => `<rect x="${L}" y="${y(hi)}" width="${pw}" height="${y(lo) - y(hi)}" fill="${c}" fill-opacity=".13" /><text x="${L - 6}" y="${(y(hi) + y(lo)) / 2 + 3}" text-anchor="end" font-size="9" font-weight="600" fill="${c}">${n}</text>`).join('');
   const ticks = [0, 1, 2, 3].map((k) => { const ms = t0 + (span * k) / 3; return `<text x="${x(ms)}" y="${H - 7}" text-anchor="${k === 0 ? 'start' : k === 3 ? 'end' : 'middle'}" font-size="9" fill="currentColor" fill-opacity=".7">${lab(ms)}</text>`; }).join('');
+  const P = t.points.map(([d, v]) => [x(Date.parse(d)), y(v)]);
+  const line = P.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const area = `${L},${y(0)} ${line} ${P[P.length - 1][0].toFixed(1)},${y(0)}`;
   const nowMs = Date.parse(t.now);
-  const now = nowMs >= t0 && nowMs <= t1 ? `<line x1="${x(nowMs)}" x2="${x(nowMs)}" y1="${T}" y2="${T + ph}" stroke="currentColor" stroke-dasharray="3 3" stroke-opacity=".6" /><text x="${x(nowMs) + 3}" y="${T + 9}" font-size="9" fill="currentColor">now</text>` : '';
-  const pts = t.points.map(([d, v]) => `${x(Date.parse(d)).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  let now = '';
+  if (nowMs >= t0 && nowMs <= t1) {
+    let q = P[0]; P.forEach((p, i) => { if (Date.parse(t.points[i][0]) <= nowMs) q = p; });
+    const nx = x(nowMs);
+    now = `<line x1="${nx}" x2="${nx}" y1="${T}" y2="${T + ph}" stroke="currentColor" stroke-dasharray="3 3" stroke-opacity=".55" /><circle cx="${nx}" cy="${q[1]}" r="4" fill="var(--accent)" stroke="var(--bg, #fff)" stroke-width="1.5" /><text x="${nx + (nx > W - 40 ? -4 : 4)}" y="${T + 9}" text-anchor="${nx > W - 40 ? 'end' : 'start'}" font-size="9" font-weight="600" fill="currentColor">now</text>`;
+  }
   const cap = t.label ? t.label.charAt(0).toUpperCase() + t.label.slice(1) : '';
-  return `<div class="trend"><p class="trend-h"><b>${esc(cap)}</b> <span class="muted">${lab(t0)} to ${lab(t1)}</span></p><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(cap)} trend">${grid}${now}<polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" points="${pts}" />${ticks}</svg></div>`;
+  return `<div class="trend"><p class="trend-h"><b>${esc(cap)}</b> <span class="muted">${lab(t0)} to ${lab(t1)}</span></p><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(cap)} trend">${bands}<polygon points="${area}" fill="var(--accent)" fill-opacity=".14" />${now}<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${line}" />${ticks}</svg><p class="muted trend-note">Shows how supportive the chart is for this period. It does not measure actual results such as enquiries or orders.</p></div>`;
 }
 // The company growth line, five years at a time: a quarterly score drawn as a small SVG, with a picker for the five-year span.
 // Every span is drawn up front and the picker only shows one of them, so there is no state to keep.
