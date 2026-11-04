@@ -1037,8 +1037,8 @@ function planetTableHtml(chart) {
 const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
 // The Check tab shows one tile per kind, each with its own box, button and result.
 const SUIT_KINDS = [
-  ['name', 'Name check', (n) => `Does a name suit ${n}? Read by numerology and the birth chart, with spelling corrections.`, 'Name to check'],
-  ['mobile', 'Mobile number check', (n) => `Does a mobile number suit ${n}? Read by numerology and the birth chart.`, 'Mobile number to check'],
+  ['name', 'Name check', (n) => `Does the name you use daily suit ${n}? A short verdict, with spelling adjustments.`, 'Name to check'],
+  ['mobile', 'Mobile number check', (n) => `Does a mobile number suit ${n}? A short verdict, with the ideal digit total.`, 'Mobile number to check'],
   ['company', 'Company name check', (n) => `Does a company name suit ${n}? Add the date and place it was incorporated for a deeper reading; no time is needed.`, 'Company name to check'],
 ];
 function suitTileHtml([kind, title, blurb, label], k) {
@@ -1083,14 +1083,19 @@ function trendHtml(t) {
 // Every span is drawn up front and the picker only shows one of them, so there is no state to keep.
 const growthSpans = (g) => { const out = []; for (let y = g.startYear; y <= g.startYear + Math.floor(g.points.length / 4) - 1; y += 5) out.push(y); return out; };
 function growthSvg(g, from) {
-  const W = 320, H = 150, L = 34, R = 8, T = 10, B = 24, pw = W - L - R, ph = H - T - B;
+  const W = 320, H = 150, L = 38, R = 10, T = 12, B = 24, pw = W - L - R, ph = H - T - B;
+  const y = (v) => T + ph * (1 - v / 100);
   const pts = [];
-  for (let i = 0; i < 20; i++) { const v = g.points[(from - g.startYear) * 4 + i]; if (v != null) pts.push([L + (pw * i) / 19, T + ph * (1 - v / 100)]); }
-  const grid = [[25, 'Low'], [50, 'Mid'], [75, 'High']].map(([v, t]) => `<line x1="${L}" x2="${W - R}" y1="${T + ph * (1 - v / 100)}" y2="${T + ph * (1 - v / 100)}" stroke="currentColor" stroke-opacity=".18" /><text x="${L - 4}" y="${T + ph * (1 - v / 100) + 4}" text-anchor="end" font-size="9" fill="currentColor" fill-opacity=".7">${t}</text>`).join('');
+  for (let i = 0; i < 20; i++) { const v = g.points[(from - g.startYear) * 4 + i]; if (v != null) pts.push([L + (pw * i) / 19, y(v), i]); }
+  // Same bands, accent line and now dot as the trend graph above so the two read as one family.
+  const bands = [[100, 65, '#3E9B6B', 'High'], [65, 35, '#D9A23B', 'Mid'], [35, 0, '#D2574F', 'Low']].map(([hi, lo, c, n]) => `<rect x="${L}" y="${y(hi)}" width="${pw}" height="${y(lo) - y(hi)}" fill="${c}" fill-opacity=".13" /><text x="${L - 6}" y="${(y(hi) + y(lo)) / 2 + 3}" text-anchor="end" font-size="9" font-weight="600" fill="${c}">${n}</text>`).join('');
   const years = [0, 1, 2, 3, 4].map((k) => `<text x="${L + (pw * (k * 4)) / 19}" y="${H - 8}" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity=".7">${from + k}</text>`).join('');
+  const line = pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const area = pts.length ? `${pts[0][0].toFixed(1)},${y(0)} ${line} ${pts[pts.length - 1][0].toFixed(1)},${y(0)}` : '';
   const nowI = (g.nowYear - from) * 4 + Math.floor(new Date().getMonth() / 3);
-  const now = nowI >= 0 && nowI < 20 ? `<line x1="${L + (pw * nowI) / 19}" x2="${L + (pw * nowI) / 19}" y1="${T}" y2="${T + ph}" stroke="currentColor" stroke-dasharray="3 3" stroke-opacity=".6" /><text x="${L + (pw * nowI) / 19 + 3}" y="${T + 9}" font-size="9" fill="currentColor">now</text>` : '';
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Company growth ${from} to ${from + 4}">${grid}${now}<polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" points="${pts.map((p) => p.join(',')).join(' ')}" />${years}</svg>`;
+  const nx = L + (pw * nowI) / 19, np = pts.find((p) => p[2] === nowI);
+  const now = nowI >= 0 && nowI < 20 ? `<line x1="${nx}" x2="${nx}" y1="${T}" y2="${T + ph}" stroke="currentColor" stroke-dasharray="3 3" stroke-opacity=".55" />${np ? `<circle cx="${nx}" cy="${np[1]}" r="4" fill="var(--accent)" stroke="var(--bg, #fff)" stroke-width="1.5" />` : ''}<text x="${nx + (nx > W - 40 ? -4 : 4)}" y="${T + 9}" text-anchor="${nx > W - 40 ? 'end' : 'start'}" font-size="9" font-weight="600" fill="currentColor">now</text>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Company growth ${from} to ${from + 4}">${bands}<polygon points="${area}" fill="var(--accent)" fill-opacity=".14" />${now}<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${line}" />${years}</svg>`;
 }
 function growthHtml(g) {
   const spans = growthSpans(g);
@@ -1106,63 +1111,32 @@ const benCau = (o, max = 99) => {
   const part = (label, arr) => (arr && arr.length ? `<p class="bc-h"><b>${label}</b></p><ul class="bc-list">${arr.slice(0, max).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '');
   return part('Benefits', o.benefits) + part('Cautions', o.cautions);
 };
-const SUIT_AREAS = [['health', 'Health'], ['wealth', 'Wealth'], ['relations', 'Relations']];
-const suitLine = (areas, list = SUIT_AREAS) => list.map(([k, label]) => `${label}: <b>${esc(areas[k])}</b>`).join(' &middot; ');
 function suitabilityHtml(r) {
-  const c = r.current;
-  // Each kind is read for its own areas (a company for business, a phone for work too), so the server sends the list.
-  const list = r.areaList || SUIT_AREAS;
-  const what = r.kind === 'mobile' ? 'Mobile number' : r.kind === 'company' ? 'Company name' : 'Name';
-  const lines = [`<p>${what}: <b>${esc(r.input)}</b></p>`, `<h4 class="h--main">Result</h4>`, ...list.map(([k, label]) => `<p>${label}: <b>${esc(c.areas[k])}</b></p>`)];
-  // A company with a date of incorporation: its own Moon nakshatra, the name against it, the owner fit and this year's transits.
-  const cc = c.companyChart;
+  // Short on purpose: one headline, then one tight paragraph per step (numbers first, then the KP verdict), so a result is a few lines, not a page.
+  const out = [`<p><b>${esc(r.input)}</b>: <b>${esc(r.verdict)}</b></p>`];
+  for (const b of r.blocks || []) {
+    const body = (b.lines || []).map((t) => esc(t)).join('<br>');
+    const items = b.items && b.items.length ? `${body ? '<br>' : ''}${b.items.map((t) => `&bull; ${esc(t)}`).join('<br>')}` : '';
+    out.push(`<p class="suit-step"><b>${esc(b.title)}${b.tag ? `: ${esc(b.tag)}` : ''}</b>${body || b.items?.length ? '<br>' : ''}${body}${items}</p>`);
+  }
+  // A company with a date of incorporation keeps its chart (Moon, this year, life periods, growth line), folded away until asked for.
+  const cc = r.companyChart;
   if (cc) {
-    lines.push(`<h4 class="h--main">Company chart (from ${esc(cc.date)})</h4>`);
-    lines.push(`<p>Moon on that date: ${cc.moons.map((m) => `<b>${esc(m.nakshatra)}</b> (${esc(m.rashi)}${cc.moons.length > 1 ? `, ${m.percent}%` : ''})`).join(', ')}</p>`);
-    if (cc.note) lines.push(`<p class="muted">${esc(cc.note)}</p>`);
-    if (cc.placeFallback) lines.push(`<p class="muted">The place was not given or not found, so the time zone of your birth place was used.</p>`);
-    const nm = cc.name;
-    if (nm.found) lines.push(`<p>The name starts with <b>${esc(nm.sound)}</b>, in <b>${esc(nm.nakshatra)}</b> (${esc(nm.rashi)}, ruled by ${esc(nm.lord)}).</p>`);
-    else lines.push(`<p>This first sound is not in the nakshatra naming table, so the name is read by its numbers only.</p>`);
-    // A company reads long, so each group keeps its two most important points under one heading.
-    const sub = (title, o) => { const h = benCau(o, 2) || (o.note ? `<p class="muted">${esc(o.note)}</p>` : ''); if (h) lines.push(`<p class="bc-sub">${title}</p>${h}`); };
-    sub('Name', nm); sub('You and the company', cc.owner); sub('This year', cc.transit);
-    // The company's own life periods, from its date of incorporation.
+    const inner = [`<p>Moon on that date: ${cc.moons.map((m) => `<b>${esc(m.nakshatra)}</b> (${esc(m.rashi)}${cc.moons.length > 1 ? `, ${m.percent}%` : ''})`).join(', ')}</p>`];
+    if (cc.note) inner.push(`<p class="muted">${esc(cc.note)}</p>`);
+    if (cc.placeFallback) inner.push(`<p class="muted">The place was not given or not found, so the time zone of your birth place was used.</p>`);
+    const sub = (title, o) => { const h = benCau(o, 2) || (o.note ? `<p class="muted">${esc(o.note)}</p>` : ''); if (h) inner.push(`<p class="bc-sub">${title}</p>${h}`); };
+    sub('You and the company', cc.owner); sub('This year', cc.transit);
     const lf = cc.lifetime;
     if (lf && lf.periods.length) {
-      lines.push(`<p class="bc-sub">Lifetime</p><ul class="bc-list">${lf.periods.map((x) => `<li><b>${x.now ? 'Now' : 'Next'}: ${esc(x.lord)}, ${x.from} to ${x.to}.</b> ${esc(x.text)}.</li>`).join('')}</ul>`);
-      if (lf.note) lines.push(`<p class="muted">${esc(lf.note)}</p>`);
+      inner.push(`<p class="bc-sub">Lifetime</p><ul class="bc-list">${lf.periods.map((x) => `<li><b>${x.now ? 'Now' : 'Next'}: ${esc(x.lord)}, ${x.from} to ${x.to}.</b> ${esc(x.text)}.</li>`).join('')}</ul>`);
+      if (lf.note) inner.push(`<p class="muted">${esc(lf.note)}</p>`);
     }
-    if (cc.growth && cc.growth.points.length >= 20) lines.push(growthHtml(cc.growth));
-    if (nm.bestStarts && nm.bestStarts.length) lines.push(`<p>Best starting sounds for the company's nakshatra: <b>${esc(nm.bestStarts.join(', '))}</b></p>`);
+    if (cc.growth && cc.growth.points.length >= 20) inner.push(growthHtml(cc.growth));
+    out.push(`<details class="suit-more"><summary>Company chart (from ${esc(cc.date)})</summary>${inner.join('')}</details>`);
   }
-  // A personal name is judged first by its first sound: nakshatra, tara from the birth nakshatra, rashi and the nakshatra lord.
-  const nk = c.nakshatra;
-  if (nk) {
-    lines.push(`<h4 class="h--main">Name and nakshatra (${esc(nk.overall || 'Not placed')})</h4>`);
-    if (nk.found) {
-      lines.push(`<p>The name starts with <b>${esc(nk.sound)}</b>, in <b>${esc(nk.nakshatra)}</b> pada ${nk.pada} (${esc(nk.rashi)}, ruled by ${esc(nk.lord)}). Your birth nakshatra is ${esc(nk.birthNakshatra)}.</p>`);
-      if (nk.alsoIn && nk.alsoIn.length) lines.push(`<p>This sound is also used in ${esc(nk.alsoIn.join(', '))}.</p>`);
-      lines.push(benCau(nk));
-    } else lines.push(`<p>This first sound is not in the nakshatra naming table, so only the number reading is used.</p>`);
-    if (nk.bestStarts && nk.bestStarts.length) lines.push(`<p>Best starting sounds for your birth nakshatra (${esc(nk.birthNakshatra)}): <b>${esc(nk.bestStarts.join(', '))}</b></p>`);
-  }
-  // The Vedic reading behind the verdict: the planet this number stands for, where it sits in the chart, and what it gives and costs.
-  for (const rd of c.readings || []) {
-    lines.push(`<h4 class="h--main">${esc(rd.label)}: number ${rd.number}, ${esc(rd.planet)} (${esc(rd.overall)})</h4><p>${esc(rd.placement)}</p>`);
-    lines.push(benCau(rd, r.kind === 'company' ? 2 : 99));
-  }
-  if (r.bestNumbers && r.bestNumbers.length) lines.push(`<p>Numbers that suit your chart best: <b>${esc(r.bestNumbers.map((b) => `${b.number} (${b.planet})`).join(', '))}</b></p>`);
-  if (c.start) lines.push(`<p>Starting sound (${esc(c.start.nakshatra)} nakshatra): <b>${c.start.ok ? 'Matches' : 'Does not match'}</b>${c.start.ok ? '' : ` &middot; favoured starts: ${esc(c.start.starts.join(', '))}`}</p>`);
-  // Corrections only where they help: a name or company that is not already favourable in every area.
-  if (r.kind !== 'mobile' && list.some(([k]) => c.areas[k] !== 'Favourable')) {
-    lines.push(`<h4 class="h--main">Spelling corrections</h4>`);
-    lines.push(r.suggestions.length
-      ? r.suggestions.map((x) => `<p><b>${esc(x.text)}</b><br>${suitLine(x.areas, list)}${x.numbers ? `<br>${esc(x.numbers)}` : ''}</p>`).join('')
-      : `<p>No spelling change that keeps the pronunciation improves it.</p>`);
-  }
-  lines.push(`<p class="bt-note disc">This is a prediction, not a guarantee.</p>`);
-  return lines.join('');
+  out.push(`<p class="kundli-bt-note kundli-disc">A prediction, not a guarantee.</p>`);
+  return out.join('');
 }
 
 // ---------------------------------------------------------------- footer: feedback and language

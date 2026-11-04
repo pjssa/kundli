@@ -388,3 +388,5 @@ body.locked { overflow: hidden; }
 .trend-h { margin: 0 0 2px; font-size: 14px; }
 .trend svg { display: block; max-width: 420px; }
 .trend-note { margin: 4px 0 0; font-size: 12px; }
+.suit-step { margin: 6px 0; }
+.suit-more summary { cursor: pointer; font-weight: 600; margin: 6px 0; }
