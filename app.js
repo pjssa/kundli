@@ -235,10 +235,10 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
-// The daily forecast lives in the pinned bottom row: a compact on/off button beside Feedback, with one small line above it for the status,
-// Send now and any error. The ids are the ones wireNotifyPanel looks for.
+// The daily forecast lives in the pinned bottom row: a main button beside Feedback (Send now when on, Turn on when off), with one small line above it for the status,
+// the small Turn off link and any error. The ids are the ones wireNotifyPanel looks for.
 function notifyNoteHtml(hasMine) {
-  return `<div class="dock-note" id="notifyPanel"><span class="muted">Daily Forecast: ${hasMine ? '' : 'first tick &ldquo;This is me&rdquo; on your own chart. '}<span id="notifyStatus">Checking&hellip;</span></span><button class="btn-link" id="notifyTest" hidden>Send now</button><span class="error" id="notifyErr" hidden></span></div>`;
+  return `<div class="dock-note" id="notifyPanel"><span class="muted">Daily Forecast: ${hasMine ? '' : 'first tick &ldquo;This is me&rdquo; on your own chart. '}<span id="notifyStatus">Checking&hellip;</span></span><button class="btn-link" id="notifyTest" hidden>Turn off</button><span class="error" id="notifyErr" hidden></span></div>`;
 }
 async function wireNotifyPanel() {
   const status = document.getElementById('notifyStatus'), btn = document.getElementById('notifyToggle'), test = document.getElementById('notifyTest'), err = document.getElementById('notifyErr');
@@ -248,17 +248,17 @@ async function wireNotifyPanel() {
     const st = await pushState().catch(() => ({ supported: false, reason: 'Could not check notifications on this device.', subscribed: false }));
     if (!st.supported) { status.textContent = st.reason; btn.hidden = true; test.hidden = true; return; }
     status.textContent = st.subscribed ? 'On.' : st.blocked ? 'Blocked in settings.' : 'Off.';
-    btn.hidden = false; btn.textContent = st.subscribed ? 'Turn off Daily Forecast' : 'Turn on Daily Forecast'; test.hidden = !st.subscribed;
+    btn.hidden = false; btn.textContent = st.subscribed ? 'Send now' : 'Turn on Daily Forecast'; test.hidden = !st.subscribed; test.textContent = 'Turn off';
+    const run = async (el, fn) => {
+      show(''); el.disabled = true;
+      try { await fn(); } catch (e) { show(e.message); }
+      el.disabled = false;
+    };
     btn.onclick = async () => {
-      show(''); btn.disabled = true;
-      try { if (st.subscribed) await disablePush(); else await enablePush(); } catch (e) { show(e.message); }
-      btn.disabled = false; draw();
+      if (st.subscribed) { await run(btn, () => call('kundliPublic_pushTest')); return; }
+      await run(btn, enablePush); draw();
     };
-    test.onclick = async () => {
-      show(''); test.disabled = true;
-      try { await call('kundliPublic_pushTest'); } catch (e) { show(e.message); }
-      test.disabled = false;
-    };
+    test.onclick = async () => { await run(test, disablePush); draw(); };
   };
   draw();
 }
