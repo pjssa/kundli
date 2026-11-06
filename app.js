@@ -307,6 +307,7 @@ let pendingDaily = new URLSearchParams(location.search).has('daily');
 async function openDailyFromLink() {
   pendingDaily = false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
+  showDailyPopup({ title: 'Daily forecast', body: 'Loading today\u2019s forecast\u2026' });
   try { showDailyPopup(await call('kundliPublic_dailyForecast')); } catch (err) { showDailyPopup({ title: 'Daily forecast', body: err.message }); }
 }
 // The Amavasya, Purnima and grahan reminder opens the same popup with the next such day for the person's own chart.
@@ -314,6 +315,7 @@ let pendingSky = new URLSearchParams(location.search).has('sky');
 async function openSkyFromLink() {
   pendingSky = false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
+  showDailyPopup({ title: 'Amavasya, Purnima and grahan', body: 'Loading\u2026' });
   try { showDailyPopup(await call('kundliPublic_skyEvents')); } catch (err) { showDailyPopup({ title: 'Amavasya, Purnima and grahan', body: err.message }); }
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'daily') showDailyPopup(e.data); });
@@ -1402,4 +1404,6 @@ function installPopup() {
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; installPopup(); });
 window.addEventListener('appinstalled', () => document.getElementById('installPop')?.remove());
 installPopup();
+// A tapped notification should not wait for the home list to load first: when already signed in, the popup starts at once.
+if (getSession() || currentToken()) { if (pendingDaily) openDailyFromLink(); else if (pendingSky) openSkyFromLink(); }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* installing still works from the browser menu */ });
