@@ -7,7 +7,7 @@ self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { title: 'Cosmic Math', body: event.data ? event.data.text() : '' }; }
   event.waitUntil(self.registration.showNotification(data.title || 'Cosmic Math', {
-    body: data.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: data.tag || undefined, data: { url: data.url || '/' },
+    body: data.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: data.tag || undefined, requireInteraction: true, renotify: !!data.tag, data: { url: data.url || '/' },
   }));
 });
 
@@ -19,19 +19,23 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 // suspended) window and calling focus() can resolve without showing anything, which looked like "I tapped it and nothing happened".
 // So an iPhone always opens the page with ?daily=1 or ?sky=1, which shows the message in a popup after loading. Elsewhere an open app
 // gets the message at once and a closed one opens the same link; if focusing fails the link is opened instead.
-const isIos = /iPhone|iPad|iPod/i.test(self.navigator?.userAgent || '');
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const n = event.notification;
   const url = new URL(n.data?.url || '/', self.location.origin).href;
   event.waitUntil((async () => {
-    if (!isIos) {
-      try {
-        const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        const open = wins.find((w) => w.url.startsWith(self.location.origin));
-        if (open) { open.postMessage({ type: 'daily', title: n.title, body: n.body }); await open.focus(); return; }
-      } catch { /* open the link below instead */ }
-    }
+    // An already-open (often suspended) app ignores openWindow on iOS and a bare focus() can resolve without showing anything,
+    // which was the "I tapped it and nothing happened" report. Navigating that window to the ?daily=1 link makes it load and show
+    // the popup itself; only when no window exists is a new one opened.
+    try {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const open = wins.find((w) => w.url.startsWith(self.location.origin));
+      if (open) {
+        const nav = open.navigate ? await open.navigate(url) : null;
+        await (nav || open).focus();
+        return;
+      }
+    } catch { /* open the link below instead */ }
     await self.clients.openWindow(url);
   })());
 });
