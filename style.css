@@ -390,3 +390,13 @@ body.locked { overflow: hidden; }
 .trend-note { margin: 4px 0 0; font-size: 12px; }
 .suit-step { margin: 6px 0; }
 .suit-more summary { cursor: pointer; font-weight: 600; margin: 6px 0; }
+
+/* Notifications tile on Kundli Home: today's forecast and any Amavasya, Purnima or grahan that is still valid. */
+.notice { border-top: 1px solid var(--border); padding: 8px 0; }
+.notice:first-of-type { border-top: 0; padding-top: 0; }
+.notice summary { cursor: pointer; font-weight: 600; color: var(--accent-ink); line-height: 1.4; overflow-wrap: anywhere; }
+.notice--sky summary { color: var(--ink); }
+.notice p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.notif-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.notif-help { margin: 4px 0 10px; font-size: 13px; }

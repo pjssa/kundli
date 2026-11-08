@@ -235,32 +235,43 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
-// The daily forecast lives in the pinned bottom row: a main button beside Feedback (Send now when on, Turn on when off), with one small line above it for the status,
-// the small Turn off link and any error. The ids are the ones wireNotifyPanel looks for.
-function notifyNoteHtml(hasMine) {
-  return `<div class="dock-note" id="notifyPanel"><span class="muted">Daily Forecast: ${hasMine ? '' : 'first tick &ldquo;This is me&rdquo; on your own chart. '}<span id="notifyStatus">Checking&hellip;</span></span><button class="btn-link" id="notifyTest" hidden>Turn off</button><span class="error" id="notifyErr" hidden></span></div>`;
-}
-async function wireNotifyPanel() {
-  const status = document.getElementById('notifyStatus'), btn = document.getElementById('notifyToggle'), test = document.getElementById('notifyTest'), err = document.getElementById('notifyErr');
-  if (!status) return;
-  const show = (m) => { err.hidden = !m; err.textContent = m || ''; };
+// The Notifications button in the pinned bottom row (beside Feedback) opens one popup that holds everything: the notices still valid, the single
+// on/off switch for every notification (the daily forecast and the Amavasya, Purnima and grahan reminders all use the one push subscription of this device),
+// and Send now.
+function openNotifications(hasMine) {
+  document.getElementById('notifPopup')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'notifPopup';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:40;';
+  overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;">Notifications</h2>
+    <div class="notif-switch"><span class="muted" id="nStatus">Checking&hellip;</span><button type="button" class="btn-secondary btn-small" id="nToggle" hidden></button></div>
+    <p class="muted notif-help">One switch for all of them: the daily forecast and the Amavasya, Purnima and grahan reminders.</p>
+    <p class="error" id="nErr" hidden></p>
+    <div id="nList"><p class="muted">Loading&hellip;</p></div>
+    <div class="actions"><button type="button" class="btn-secondary" id="nTest" hidden>Send now</button><button type="button" class="btn-primary" id="nClose">Close</button></div></div>`;
+  document.body.appendChild(overlay);
+  const $ = (id) => overlay.querySelector(id);
+  $('#nClose').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const show = (m) => { $('#nErr').hidden = !m; $('#nErr').textContent = m || ''; };
+  const run = async (el, fn) => { show(''); el.disabled = true; try { await fn(); } catch (e) { show(e.message); } el.disabled = false; };
   const draw = async () => {
     const st = await pushState().catch(() => ({ supported: false, reason: 'Could not check notifications on this device.', subscribed: false }));
-    if (!st.supported) { status.textContent = st.reason; btn.hidden = true; test.hidden = true; return; }
-    status.textContent = st.subscribed ? 'On.' : st.blocked ? 'Blocked in settings.' : 'Off.';
-    btn.hidden = false; btn.textContent = st.subscribed ? 'Send now' : 'Turn on Daily Forecast'; test.hidden = !st.subscribed; test.textContent = 'Turn off';
-    const run = async (el, fn) => {
-      show(''); el.disabled = true;
-      try { await fn(); } catch (e) { show(e.message); }
-      el.disabled = false;
-    };
-    btn.onclick = async () => {
-      if (st.subscribed) { await run(btn, () => call('kundliPublic_pushTest')); return; }
-      await run(btn, enablePush); draw();
-    };
-    test.onclick = async () => { await run(test, disablePush); draw(); };
+    if (!st.supported) { $('#nStatus').textContent = st.reason; $('#nToggle').hidden = true; $('#nTest').hidden = true; return; }
+    $('#nStatus').textContent = st.subscribed ? 'Notifications are on.' : st.blocked ? 'Notifications are blocked in settings.' : 'Notifications are off.';
+    $('#nToggle').hidden = false; $('#nToggle').textContent = st.subscribed ? 'Turn off' : 'Turn on';
+    $('#nTest').hidden = !st.subscribed;
+    $('#nToggle').onclick = async () => { await run($('#nToggle'), st.subscribed ? disablePush : enablePush); draw(); };
+    $('#nTest').onclick = () => run($('#nTest'), () => call('kundliPublic_pushTest'));
   };
   draw();
+  (async () => {
+    if (!hasMine) { $('#nList').innerHTML = '<p class="muted">First tick &ldquo;This is me&rdquo; on your own chart to see your notifications.</p>'; return; }
+    try {
+      const r = await call('kundliPublic_notices');
+      $('#nList').innerHTML = (r.needsMine ? '' : noticesHtml(r.items)) || '<p class="muted">Nothing to show right now.</p>';
+    } catch (e) { $('#nList').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+  })();
 }
 
 // Asked once each time the app is opened until a chart is marked as the person's own; "Not now" only silences it for this visit.
@@ -320,6 +331,12 @@ async function openSkyFromLink() {
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'daily') showDailyPopup(e.data); });
 
+// The list inside the Notifications popup: today's forecast and any Amavasya, Purnima or grahan that is still valid. The server decides what is valid
+// (forecast to midnight, an event from the day before to 11 pm on the day); the time is checked again here in case the popup was opened long ago.
+function noticesHtml(items) {
+  const live = (items || []).filter((n) => Date.parse(n.validUntil) > Date.now());
+  return live.map((n, i) => `<details class="notice notice--${esc(n.kind)}"${i < 2 ? ' open' : ''}><summary>${esc(n.title)}</summary>${String(n.body).split('\n').filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join('')}</details>`).join('');
+}
 async function renderList() {
   peopleCache = null;
   detailId = '';
@@ -343,7 +360,7 @@ async function renderList() {
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<div class="intro-row"><p class="muted">Add yourself and family, then ask CosmicMath about any of them.</p><button type="button" class="btn-primary btn-small" id="addBtn">+ Add a<br>birth chart</button></div>'}
     ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
-    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner">${notifyNoteHtml(items.some((k) => k.isMine))}<div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle" hidden></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
+    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Notifications</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
@@ -360,7 +377,7 @@ async function renderList() {
   document.querySelector('#signOut img.avatar')?.addEventListener('error', (e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar avatar--initial', textContent: initialOf(who) })); });
   onLangChange = null;
   wireFooter();
-  wireNotifyPanel();
+  document.getElementById('notifyToggle')?.addEventListener('click', () => openNotifications(items.some((k) => k.isMine)));
   askWhichIsMine(items);
   if (pendingDaily) openDailyFromLink();
   if (pendingSky) openSkyFromLink();
