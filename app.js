@@ -235,6 +235,11 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
+// The old debts the chart carries (the server decides which, from fixed rules), under the notices. Not counted in the badge, since they are not news.
+function debtsHtml(debts) {
+  if (!Array.isArray(debts)) return '';
+  return `<h3 class="notif-h">Old debts in your chart</h3>${debts.length ? debts.map((d) => `<details class="notice notice--debt"><summary>${esc(d.title)}${d.activeNow ? ' <span class="debt-now">running now</span>' : ''}</summary><p>${esc(d.why)}</p><p><b>Affects:</b> ${esc(d.areasText)}</p><p><b>Remedy:</b> ${esc(d.remedy)}</p></details>`).join('') : '<p class="muted">No clear old debt shows in your chart.</p>'}`;
+}
 // The Notifications button in the pinned bottom row (beside Feedback) opens one popup that holds everything: the notices still valid, the single
 // on/off switch for every notification (the daily forecast and the Amavasya, Purnima and grahan reminders all use the one push subscription of this device),
 // and Send now.
@@ -290,7 +295,7 @@ function openNotifications(hasMine) {
     if (!hasMine) { $('#nList').innerHTML = '<p class="muted">First tick &ldquo;This is me&rdquo; on your own chart to see your notifications.</p>'; return; }
     try {
       const r = await call('kundliPublic_notices');
-      $('#nList').innerHTML = (r.needsMine ? '' : noticesHtml(r.items)) || '<p class="muted">Nothing to show right now.</p>';
+      $('#nList').innerHTML = (r.needsMine ? '<p class="muted">Nothing to show right now.</p>' : (noticesHtml(r.items) || '<p class="muted">No new notice right now.</p>') + debtsHtml(r.debts));
       if (!r.needsMine) { markNoticesSeen((r.items || []).filter((n) => Date.parse(n.validUntil) > Date.now())); drawNoticeBadge(0); }
     } catch (e) { $('#nList').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
   })();

@@ -404,3 +404,6 @@ body.locked { overflow: hidden; }
 /* Count of unseen notices on the Notifications button. */
 .notify-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px; border-radius: 10px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; vertical-align: middle; }
 .notify-badge[hidden] { display: none; }
+
+.notif-h { font-family: var(--font-serif); font-size: 18px; font-weight: 600; margin: 16px 0 6px; color: var(--accent-ink); }
+.debt-now { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink); font-size: 11px; font-weight: 600; vertical-align: middle; }
