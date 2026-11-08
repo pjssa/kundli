@@ -347,7 +347,7 @@ function buildTiles(r, x) {
   return tiles;
 }
 function tilesGridHtml(tiles) {
-  return `${tiles[0]?.person ? `<p class="ntile-who">Notifications for <b>${esc(tiles[0].person)}</b></p>` : ''}<div class="ntiles">${tiles.map((t, i) => `<button type="button" class="ntile" data-i="${i}"><span class="ntile-icon" aria-hidden="true">${t.icon}</span><b>${esc(t.title)}</b><small>${esc(t.hint)}</small>${t.unseen ? '<span class="ntile-dot" aria-label="New"></span>' : ''}</button>`).join('')}</div>`;
+  return `<div class="ntiles">${tiles.map((t, i) => `<button type="button" class="ntile" data-i="${i}"><span class="ntile-icon" aria-hidden="true">${t.icon}</span><b>${esc(t.title)}</b><small>${esc(t.hint)}</small>${t.unseen ? '<span class="ntile-dot" aria-label="New"></span>' : ''}</button>`).join('')}</div>`;
 }
 function openTileDetail(tiles, start, onOpen, ctl) {
   let i = start;
@@ -358,11 +358,10 @@ function openTileDetail(tiles, start, onOpen, ctl) {
   lockScroll();
   const q = (sel) => overlay.querySelector(sel), body = q('.ntile-body');
   const locHtml = () => `<div class="ntile-loc"><span>\u{1F4CD} Times for <b>${esc(ctl.label || 'the birth place')}</b></span><button type="button" class="ntile-loc-btn" data-act="toggle">Change</button></div><div class="ntile-loc-form" hidden><div class="ntile-loc-city"><input type="text" placeholder="Type a city" aria-label="City" /><button type="button" class="ntile-loc-btn" data-act="city">Set</button></div><p class="ntile-loc-err" hidden></p></div>`;
-  const calHtml = (t) => !t.events?.length ? '' : `<div class="ntile-cal"><p class="muted">${t.events.length} event${t.events.length === 1 ? '' : 's'} for your calendar, each with a reminder 30 minutes before.${t.events.some((e) => e.weeklyUntil) ? ' Weekly remedies repeat while the chart needs them, and come back in each later period that brings them.' : ''}</p><div class="ntile-cal-row">${ctl?.auto ? '<button type="button" class="ntile-cal-btn ntile-cal-btn--main" data-cal="auto">Add to my Google Calendar</button>' : ''}<button type="button" class="ntile-cal-btn" data-cal="ics">\u{1F4C5} Add to calendar${ctl?.auto ? ' (file)' : ''}</button></div><p class="ntile-cal-msg" hidden></p></div>`;
   const draw = (dir) => {
     const t = tiles[i];
     q('.ntile-title').textContent = `${t.icon} ${t.title}`;
-    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('') + calHtml(t);
+    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
     body.scrollTop = 0;
     q('.ntile-count').textContent = `${i + 1} of ${tiles.length}`;
     overlay.querySelectorAll('.ntile-nav').forEach((b) => { b.disabled = (Number(b.dataset.d) < 0 && i === 0) || (Number(b.dataset.d) > 0 && i === tiles.length - 1); });
@@ -382,16 +381,6 @@ function openTileDetail(tiles, start, onOpen, ctl) {
       await ctl.onPlace({ city: v });
       draw(0);
     } catch (ex) { err.textContent = ex.message; err.hidden = false; b.disabled = false; }
-  });
-  body.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-cal]');
-    if (!b) return;
-    const t = tiles[i], msg = body.querySelector('.ntile-cal-msg');
-    msg.hidden = false; msg.textContent = '';
-    if (b.dataset.cal === 'ics') { downloadIcs(t.events, t.person); msg.textContent = 'The calendar file is ready. Open it to add the events.'; return; }
-    b.disabled = true; msg.textContent = 'Adding\u2026';
-    try { const r = await ctl.auto(t); msg.textContent = `Added ${r.added} to your Google Calendar${r.skipped ? `, ${r.skipped} were already there` : ''}.`; } catch (ex) { msg.textContent = ex.message; }
-    b.disabled = false;
   });
   const go = (d) => { const n = i + d; if (n >= 0 && n < tiles.length) { i = n; draw(d); } };
   const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); unlockScroll(); };
@@ -446,6 +435,7 @@ function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar, ui) {
     ctl.label = extras?.place?.label || '';
     list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
     renderBar();
+    if (ui?.title && tiles[0]?.person) ui.title.textContent = `${tiles[0].person}: Notifications`;
     list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
       if (!t.noticeId || !t.unseen) return;
       markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
@@ -489,8 +479,8 @@ function openNotifications() {
   const overlay = document.createElement('div');
   overlay.id = 'notifPopup';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;overscroll-behavior:contain;z-index:40;';
-  overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;">Notifications</h2>
-    <div class="notif-switch"><span class="muted" id="nStatus">Checking&hellip;</span></div>
+  overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;" id="nTitle">Notifications</h2>
+    <p class="muted" id="nStatus" hidden></p>
     <p class="error" id="nErr" hidden></p>
     <div id="nList"><p class="muted">Loading&hellip;</p></div>
     <p class="ntile-cal-msg" id="nAllMsg" hidden></p>
@@ -505,15 +495,17 @@ function openNotifications() {
   const run = async (el, fn) => { show(''); el.disabled = true; try { await fn(); } catch (e) { show(e.message); } el.disabled = false; };
   const draw = async () => {
     const st = await pushState().catch(() => ({ supported: false, reason: 'Could not check notifications on this device.', subscribed: false }));
-    if (!st.supported) { $('#nStatus').textContent = st.reason; $('#nToggle').hidden = true; $('#nTest').hidden = true; return; }
-    $('#nStatus').textContent = st.subscribed ? 'Notifications are on.' : st.blocked ? 'Notifications are blocked in settings.' : 'Notifications are off.';
+    // On or off is told by the button itself (Turn off or Turn on); the line is only for a reason notifications cannot work here.
+    const setStatus = (t) => { $('#nStatus').textContent = t || ''; $('#nStatus').hidden = !t; };
+    if (!st.supported) { setStatus(st.reason); $('#nToggle').hidden = true; $('#nTest').hidden = true; return; }
+    setStatus(st.blocked ? 'Notifications are blocked in settings.' : '');
     $('#nToggle').hidden = false; $('#nToggle').textContent = st.subscribed ? 'Turn off' : 'Turn on';
     $('#nTest').hidden = !st.subscribed;
     $('#nToggle').onclick = async () => { await run($('#nToggle'), st.subscribed ? disablePush : enablePush); draw(); };
     $('#nTest').onclick = () => run($('#nTest'), () => call('kundliPublic_pushTest'));
   };
   draw();
-  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p), null, { bar: $('#nBar'), msg: $('#nAllMsg') });
+  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p), null, { bar: $('#nBar'), msg: $('#nAllMsg'), title: $('#nTitle') });
 }
 
 // The 7 am notification opens this: today's forecast in a popup, readable in full.
