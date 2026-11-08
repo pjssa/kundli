@@ -246,7 +246,7 @@ function drawNoticeBadge(count) {
   const badge = document.getElementById('notifyBadge'), btn = document.getElementById('notifyToggle');
   if (!badge || !btn) return;
   badge.hidden = !count; badge.textContent = count > 9 ? '9+' : String(count);
-  btn.setAttribute('aria-label', count ? `Notifications, ${count} new` : 'Notifications');
+  btn.setAttribute('aria-label', count ? `Information, ${count} new` : 'Information');
 }
 async function refreshNoticeBadge() {
   if (!selectedId) { drawNoticeBadge(0); return; }
@@ -435,7 +435,7 @@ function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar, ui) {
     ctl.label = extras?.place?.label || '';
     list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
     renderBar();
-    if (ui?.title && tiles[0]?.person) ui.title.textContent = `${tiles[0].person}: Notifications`;
+    if (ui?.title && tiles[0]?.person) ui.title.textContent = `${tiles[0].person}: Information`;
     list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
       if (!t.noticeId || !t.unseen) return;
       markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
@@ -458,10 +458,10 @@ function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar, ui) {
   const cached = sel() ? loadCache(cacheKey()) : null;
   if (cached) { notices = cached.notices; extras = cached.extras; render(); }
   (async () => {
-    if (!sel()) { list.innerHTML = '<p class="muted">Choose a person on the Home screen to see their notifications.</p>'; return; }
+    if (!sel()) { list.innerHTML = '<p class="muted">Choose a person on the Home screen to see their information.</p>'; return; }
     try {
       const n = await apiNotices({ kundliId: sel() });
-      if (n.needsMine) { list.innerHTML = '<p class="muted">Choose a person on the Home screen to see their notifications.</p>'; return; }
+      if (n.needsMine) { list.innerHTML = '<p class="muted">Choose a person on the Home screen to see their information.</p>'; return; }
       notices = n; render();
     } catch (e) { if (!notices) { list.innerHTML = `<p class="muted">Could not load: ${esc(e.message)}</p>`; return; } }
     const loadX = async () => {
@@ -479,7 +479,7 @@ function openNotifications() {
   const overlay = document.createElement('div');
   overlay.id = 'notifPopup';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;overscroll-behavior:contain;z-index:40;';
-  overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;" id="nTitle">Notifications</h2>
+  overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;" id="nTitle">Information</h2>
     <p class="muted" id="nStatus" hidden></p>
     <p class="error" id="nErr" hidden></p>
     <div id="nList"><p class="muted">Loading&hellip;</p></div>
@@ -564,7 +564,7 @@ async function renderList() {
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<div class="intro-row"><p class="muted">Add yourself and family, then ask CosmicMath about any of them.</p><button type="button" class="btn-primary btn-small" id="addBtn">+ Add a<br>birth chart</button></div>'}
     ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(fmtTime12(k.birthTime))} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
-    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Notifications<span class="notify-badge" id="notifyBadge" hidden></span></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
+    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Information<span class="notify-badge" id="notifyBadge" hidden></span></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
