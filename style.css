@@ -463,3 +463,11 @@ body.locked { overflow: hidden; }
 
 .ntile-all { margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
 .ntile-all > p.muted { margin: 0 0 6px; font-size: 13px; }
+
+/* The popup's bottom row: on/off, Send now, Add all and Close, always in one row (short labels; the full wording is in each button's title). */
+.ntile-bar { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 6px; }
+.ntile-bar > button { flex: 1 1 0; min-width: 0; padding-left: 6px; padding-right: 6px; font-size: 13px; white-space: nowrap; }
+@media (max-width: 380px) { .ntile-bar { gap: 4px; } .ntile-bar > button { font-size: 12px; padding-left: 4px; padding-right: 4px; } }
+.ntile-bar > button svg { display: block; margin: 0 auto; }
+.ntile-bar > button[data-all] { background: linear-gradient(135deg, #FFF6E0, #FFE2A6); border-color: #E3B75C; }
+.ntile-bar > button[data-all]:hover { background: linear-gradient(135deg, #FFFBF0, #FFEBBE); }

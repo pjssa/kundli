@@ -325,6 +325,9 @@ const debtStatus = (d) => {
   if (d.activeNow) return `Running now${d.activeUntil ? `, until ${day(d.activeUntil)}` : ''}.`;
   return d.nextFrom ? `Not running now. Next active from ${day(d.nextFrom)}.` : 'Not running now, and not active in the next five years.';
 };
+// Icons for the bottom row (inline coloured SVG): a calendar with a plus, and a download arrow for the file.
+const CAL_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" fill="#fff" stroke="#D9D2C3" stroke-width="0.8"/><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h12a2.5 2.5 0 0 1 2.5 2.5V10h-17z" fill="#E5484D"/><rect x="7.5" y="3" width="2" height="4" rx="1" fill="#B8343A"/><rect x="14.5" y="3" width="2" height="4" rx="1" fill="#B8343A"/><path d="M12 12.8v5M9.5 15.3h5" stroke="#2F9E6B" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const FILE_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5" fill="#fff" stroke="#D9D2C3" stroke-width="0.8"/><path d="M12 7v7.5M8.8 11.8 12 15l3.2-3.2" fill="none" stroke="#3B82F6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 18h8" stroke="#E5484D" stroke-width="2" stroke-linecap="round"/></svg>';
 function buildTiles(r, x) {
   const seen = seenNotices();
   const tiles = [];
@@ -409,7 +412,7 @@ function openTileDetail(tiles, start, onOpen, ctl) {
   draw(0);
 }
 // Fills the tile grid: from the saved copy at once, then from the server. apiNotices and apiExtras take the payload and return the server answer.
-function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar) {
+function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar, ui) {
   let place = loadPlace(), notices = null, extras = null;
   const tiles = [], ctl = { label: '' };
   const sel = () => selectedId;
@@ -419,19 +422,30 @@ function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar) {
   if (apiCalendar) ctl.auto = (t) => apiCalendar({ ...extrasPayload(), tile: t.key });
   // One button for every tile at once, shown once the extra sections have loaded so the count is complete.
   const allEvents = () => { const m = new Map(); for (const t of tiles) for (const e of t.events || []) m.set(e.id, e); return [...m.values()]; };
-  const allCalHtml = () => { const n = extras === null ? 0 : allEvents().length; return n ? `<div class="ntile-all"><p class="muted">${n} events from all the tiles for your calendar, each with a reminder 30 minutes before.</p><div class="ntile-cal-row">${apiCalendar ? '<button type="button" class="ntile-cal-btn ntile-cal-btn--main" data-all="auto">Add everything to my Google Calendar</button>' : ''}<button type="button" class="ntile-cal-btn" data-all="ics">\u{1F4C5} Add everything to calendar${apiCalendar ? ' (file)' : ''}</button></div><p class="ntile-cal-msg" hidden></p></div>` : ''; };
+  // The Add-all buttons live in the popup's bottom row (ui.bar), beside Close, and say how it went in ui.msg. Shown once the extra sections have loaded so the count is complete.
+  const onAll = async (e) => {
+    const b = e.currentTarget, msg = ui.msg;
+    msg.hidden = false;
+    if (b.dataset.all === 'ics') { downloadIcs(allEvents(), tiles[0]?.person); msg.textContent = 'The calendar file is ready. Open it to add the events.'; return; }
+    b.disabled = true; msg.textContent = 'Adding everything\u2026 this can take a little while.';
+    try { const r = await apiCalendar({ ...extrasPayload(), tile: 'all' }); msg.textContent = `Added ${r.added} to your Google Calendar${r.skipped ? `, ${r.skipped} were already there` : ''}.`; } catch (ex) { msg.textContent = ex.message; }
+    b.disabled = false;
+  };
+  const renderBar = () => {
+    if (!ui?.bar) return;
+    ui.bar.querySelectorAll('[data-all]').forEach((b) => b.remove());
+    const n = extras === null ? 0 : allEvents().length;
+    if (!n) return;
+    const end = ui.bar.querySelector('[data-bar-end]');
+    const add = (kind, icon, label, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.dataset.all = kind; b.innerHTML = icon; b.setAttribute('aria-label', label); b.title = `${label}: ${n} events from the tiles, each with a reminder 30 minutes before`; b.addEventListener('click', onAll); ui.bar.insertBefore(b, end); };
+    if (apiCalendar) add('auto', CAL_ICON, 'Add all to my Google Calendar', 'btn-secondary');
+    add('ics', apiCalendar ? FILE_ICON : CAL_ICON, apiCalendar ? 'Add all as a calendar file' : 'Add all to calendar', 'btn-secondary');
+  };
   const render = () => {
     tiles.splice(0, tiles.length, ...buildTiles(notices || {}, extras));
     ctl.label = extras?.place?.label || '';
-    list.innerHTML = allCalHtml() + tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
-    list.querySelectorAll('[data-all]').forEach((b) => b.addEventListener('click', async () => {
-      const msg = list.querySelector('.ntile-all .ntile-cal-msg');
-      msg.hidden = false;
-      if (b.dataset.all === 'ics') { downloadIcs(allEvents(), tiles[0]?.person); msg.textContent = 'The calendar file is ready. Open it to add the events.'; return; }
-      b.disabled = true; msg.textContent = 'Adding everything\u2026 this can take a little while.';
-      try { const r = await apiCalendar({ ...extrasPayload(), tile: 'all' }); msg.textContent = `Added ${r.added} to your Google Calendar${r.skipped ? `, ${r.skipped} were already there` : ''}.`; } catch (ex) { msg.textContent = ex.message; }
-      b.disabled = false;
-    }));
+    list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
+    renderBar();
     list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
       if (!t.noticeId || !t.unseen) return;
       markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
@@ -476,11 +490,11 @@ function openNotifications() {
   overlay.id = 'notifPopup';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;overscroll-behavior:contain;z-index:40;';
   overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;">Notifications</h2>
-    <div class="notif-switch"><span class="muted" id="nStatus">Checking&hellip;</span><button type="button" class="btn-secondary btn-small" id="nToggle" hidden></button></div>
-    <p class="muted notif-help">One switch for all of them: the daily forecast and the Amavasya, Purnima and grahan reminders.</p>
+    <div class="notif-switch"><span class="muted" id="nStatus">Checking&hellip;</span></div>
     <p class="error" id="nErr" hidden></p>
     <div id="nList"><p class="muted">Loading&hellip;</p></div>
-    <div class="actions"><button type="button" class="btn-secondary" id="nTest" hidden>Send now</button><button type="button" class="btn-primary" id="nClose">Close</button></div></div>`;
+    <p class="ntile-cal-msg" id="nAllMsg" hidden></p>
+    <div class="actions ntile-bar" id="nBar"><button type="button" class="btn-secondary" id="nToggle" hidden></button><button type="button" class="btn-secondary" id="nTest" hidden>Send now</button><button type="button" class="btn-primary" id="nClose" data-bar-end>Close</button></div></div>`;
   document.body.appendChild(overlay);
   lockScroll();
   const $ = (id) => overlay.querySelector(id);
@@ -499,7 +513,7 @@ function openNotifications() {
     $('#nTest').onclick = () => run($('#nTest'), () => call('kundliPublic_pushTest'));
   };
   draw();
-  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p));
+  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p), null, { bar: $('#nBar'), msg: $('#nAllMsg') });
 }
 
 // The 7 am notification opens this: today's forecast in a popup, readable in full.
