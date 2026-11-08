@@ -319,6 +319,12 @@ function downloadIcs(events, who) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
+// Whether an old debt is active now and until when, or when it next becomes active, so a debt that is in the chart but not running is not left unexplained.
+const debtStatus = (d) => {
+  const day = (iso) => fmtDate(`${iso}T12:00:00`);
+  if (d.activeNow) return `Running now${d.activeUntil ? `, until ${day(d.activeUntil)}` : ''}.`;
+  return d.nextFrom ? `Not running now. Next active from ${day(d.nextFrom)}.` : 'Not running now, and not active in the next five years.';
+};
 function buildTiles(r, x) {
   const seen = seenNotices();
   const tiles = [];
@@ -329,8 +335,9 @@ function buildTiles(r, x) {
     tiles.push({ noticeId: n.id, key: n.kind === 'sky' ? 'sky' : '', events: n.events || [], icon: TILE_ICONS[n.kind] || '\u{1F514}', title: n.title, hint: lines[0] || '', blocks: [{ lines }], unseen: !seen.has(n.id) });
   }
   if (Array.isArray(r.debts)) {
-    tiles.push({ key: 'debts', events: Object.values(x?.debtCalendar || {}).flat(), icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in the chart` : 'None clear in the chart',
-      blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in this chart.'] }] });
+    const running = r.debts.filter((d) => d.activeNow).length;
+    tiles.push({ key: 'debts', events: Object.values(x?.debtCalendar || {}).flat(), icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in the chart${running ? `, ${running} running now` : ''}` : 'None clear in the chart',
+      blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [debtStatus(d), d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in this chart.'] }] });
   }
   for (const s of (x?.sections || [])) tiles.push({ key: s.id, events: s.events || [], icon: TILE_ICONS[s.id] || '✨', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' · '), intro: s.intro, blocks: s.items, locatable: ['today', 'goodtime', 'nazar'].includes(s.id) });
   tiles.forEach((t) => { t.person = person; });
