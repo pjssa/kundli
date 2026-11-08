@@ -19,7 +19,7 @@ const SOUTH_GRID = [[11, 0, 1, 2], [10, null, null, 3], [9, null, null, 4], [8, 
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
-const fmtBirth = (k) => `${fmtDate(k.birthDate + 'T12:00:00')} · ${k.timeUnknown && k.rectification?.status !== 'applied' ? 'time not known' : `${k.birthTime}${k.timeUnknown ? ' (estimated)' : ''}`}`;
+const fmtBirth = (k) => `${fmtDate(k.birthDate + 'T12:00:00')} · ${k.timeUnknown && k.rectification?.status !== 'applied' ? 'time not known' : `${fmtTime12(k.birthTime)}${k.timeUnknown ? ' (estimated)' : ''}`}`;
 
 // ---------------------------------------------------------------- auth
 
@@ -277,10 +277,48 @@ function phonePlace() {
       { timeout: 8000, maximumAge: 600000 });
   });
 }
+// The phone's location is taken when the app opens, not when the popup does: the permission prompt is shown then if the browser has not been asked yet, and the position is
+// refreshed silently once it is allowed. A typed city is an explicit choice and is left alone; a refusal just leaves the times on the birth place.
+let autoPlaceDone = false;
+async function autoPlace() {
+  if (autoPlaceDone) return;
+  autoPlaceDone = true;
+  if (loadPlace()?.city) return;
+  let state = 'unknown';
+  try { state = (await navigator.permissions.query({ name: 'geolocation' })).state; } catch { /* no Permissions API: the saved flag stands in */ }
+  if (state === 'denied' || (state === 'unknown' && placeAskedOff())) return;
+  try { savePlace(await phonePlace()); } catch { if (state === 'unknown') setPlaceAskedOff(true); }
+}
 // The page behind a popup must not scroll with it. Counted, since the tile popup opens on top of the notifications popup.
 let scrollLocks = 0;
 function lockScroll() { if (scrollLocks++ === 0) { document.documentElement.style.overflow = 'hidden'; document.body.style.overflow = 'hidden'; } }
 function unlockScroll() { if (scrollLocks > 0 && --scrollLocks === 0) { document.documentElement.style.overflow = ''; document.body.style.overflow = ''; } }
+// The days and times in a tile as a calendar file (.ics), which Google, Apple and Outlook calendars all open. Times are UTC so they land at the right local time everywhere;
+// a weekly remedy carries its last date (UNTIL), and each event carries a reminder 30 minutes before.
+const icsEscape = (t) => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const icsFold = (line) => { const out = []; let s = line; while (s.length > 70) { out.push(s.slice(0, 70)); s = ' ' + s.slice(70); } out.push(s); return out.join('\r\n'); };
+const icsStamp = (iso) => iso.replace(/[-:]/g, '');
+function icsFor(events) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cosmic Math//Remedies//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  const now = icsStamp(new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'));
+  for (const e of events) {
+    lines.push('BEGIN:VEVENT', `UID:${e.id}@cosmicmath.in`, `DTSTAMP:${now}`);
+    if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${e.allDay.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${new Date(Date.parse(`${e.allDay}T00:00:00Z`) + 86400000).toISOString().slice(0, 10).replace(/-/g, '')}`);
+    else lines.push(`DTSTART:${icsStamp(e.start)}`, `DTEND:${icsStamp(e.end)}`);
+    lines.push(`SUMMARY:${icsEscape(e.title)}`, `DESCRIPTION:${icsEscape(e.description)}`);
+    if (e.weeklyUntil) lines.push(`RRULE:FREQ=WEEKLY;UNTIL=${e.weeklyUntil.replace(/-/g, '')}T235959Z`);
+    lines.push('BEGIN:VALARM', 'TRIGGER:-PT30M', 'ACTION:DISPLAY', `DESCRIPTION:${icsEscape(e.title)}`, 'END:VALARM', 'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return lines.map(icsFold).join('\r\n') + '\r\n';
+}
+function downloadIcs(events, who) {
+  const url = URL.createObjectURL(new Blob([icsFor(events)], { type: 'text/calendar;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = `${String(who || 'cosmic-math').replace(/[^\w]+/g, '-').toLowerCase()}-remedies.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 function buildTiles(r, x) {
   const seen = seenNotices();
   const tiles = [];
@@ -288,13 +326,13 @@ function buildTiles(r, x) {
   for (const n of (r.items || [])) {
     if (!(Date.parse(n.validUntil) > Date.now())) continue;
     const lines = String(n.body).split('\n').filter(Boolean);
-    tiles.push({ noticeId: n.id, icon: TILE_ICONS[n.kind] || '\u{1F514}', title: n.title, hint: lines[0] || '', blocks: [{ lines }], unseen: !seen.has(n.id) });
+    tiles.push({ noticeId: n.id, key: n.kind === 'sky' ? 'sky' : '', events: n.events || [], icon: TILE_ICONS[n.kind] || '\u{1F514}', title: n.title, hint: lines[0] || '', blocks: [{ lines }], unseen: !seen.has(n.id) });
   }
   if (Array.isArray(r.debts)) {
-    tiles.push({ icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in the chart` : 'None clear in the chart',
+    tiles.push({ key: 'debts', events: Object.values(x?.debtCalendar || {}).flat(), icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in the chart` : 'None clear in the chart',
       blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in this chart.'] }] });
   }
-  for (const s of (x?.sections || [])) tiles.push({ icon: TILE_ICONS[s.id] || '✨', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' · '), intro: s.intro, blocks: s.items, locatable: ['today', 'goodtime', 'nazar'].includes(s.id) });
+  for (const s of (x?.sections || [])) tiles.push({ key: s.id, events: s.events || [], icon: TILE_ICONS[s.id] || '✨', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' · '), intro: s.intro, blocks: s.items, locatable: ['today', 'goodtime', 'nazar'].includes(s.id) });
   tiles.forEach((t) => { t.person = person; });
   return tiles;
 }
@@ -309,11 +347,12 @@ function openTileDetail(tiles, start, onOpen, ctl) {
   document.body.appendChild(overlay);
   lockScroll();
   const q = (sel) => overlay.querySelector(sel), body = q('.ntile-body');
-  const locHtml = () => `<div class="ntile-loc"><span>\u{1F4CD} Times for <b>${esc(ctl.label || 'the birth place')}</b></span><button type="button" class="ntile-loc-btn" data-act="toggle">Change</button></div><div class="ntile-loc-form" hidden><button type="button" class="ntile-loc-btn" data-act="phone">Use my phone location</button><div class="ntile-loc-city"><input type="text" placeholder="Type a city" aria-label="City" /><button type="button" class="ntile-loc-btn" data-act="city">Set</button></div><button type="button" class="ntile-loc-btn" data-act="birth">Use the birth place</button><p class="ntile-loc-err" hidden></p></div>`;
+  const locHtml = () => `<div class="ntile-loc"><span>\u{1F4CD} Times for <b>${esc(ctl.label || 'the birth place')}</b></span><button type="button" class="ntile-loc-btn" data-act="toggle">Change</button></div><div class="ntile-loc-form" hidden><div class="ntile-loc-city"><input type="text" placeholder="Type a city" aria-label="City" /><button type="button" class="ntile-loc-btn" data-act="city">Set</button></div><p class="ntile-loc-err" hidden></p></div>`;
+  const calHtml = (t) => !t.events?.length ? '' : `<div class="ntile-cal"><p class="muted">${t.events.length} event${t.events.length === 1 ? '' : 's'} for your calendar, each with a reminder 30 minutes before.${t.events.some((e) => e.weeklyUntil) ? ' Weekly remedies repeat while the chart needs them, and come back in each later period that brings them.' : ''}</p><div class="ntile-cal-row">${ctl?.auto ? '<button type="button" class="ntile-cal-btn ntile-cal-btn--main" data-cal="auto">Add to my Google Calendar</button>' : ''}<button type="button" class="ntile-cal-btn" data-cal="ics">\u{1F4C5} Add to calendar${ctl?.auto ? ' (file)' : ''}</button></div><p class="ntile-cal-msg" hidden></p></div>`;
   const draw = (dir) => {
     const t = tiles[i];
     q('.ntile-title').textContent = `${t.icon} ${t.title}`;
-    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
+    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('') + calHtml(t);
     body.scrollTop = 0;
     q('.ntile-count').textContent = `${i + 1} of ${tiles.length}`;
     overlay.querySelectorAll('.ntile-nav').forEach((b) => { b.disabled = (Number(b.dataset.d) < 0 && i === 0) || (Number(b.dataset.d) > 0 && i === tiles.length - 1); });
@@ -328,12 +367,21 @@ function openTileDetail(tiles, start, onOpen, ctl) {
     if (b.dataset.act === 'toggle') { form.hidden = !form.hidden; return; }
     err.hidden = true; b.disabled = true;
     try {
-      let p = null;
-      if (b.dataset.act === 'phone') p = await phonePlace();
-      else if (b.dataset.act === 'city') { const v = body.querySelector('.ntile-loc-city input').value.trim(); if (v.length < 2) throw new Error('Type a city name.'); p = { city: v }; }
-      await ctl.onPlace(p);
+      const v = body.querySelector('.ntile-loc-city input').value.trim();
+      if (v.length < 2) throw new Error('Type a city name.');
+      await ctl.onPlace({ city: v });
       draw(0);
     } catch (ex) { err.textContent = ex.message; err.hidden = false; b.disabled = false; }
+  });
+  body.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-cal]');
+    if (!b) return;
+    const t = tiles[i], msg = body.querySelector('.ntile-cal-msg');
+    msg.hidden = false; msg.textContent = '';
+    if (b.dataset.cal === 'ics') { downloadIcs(t.events, t.person); msg.textContent = 'The calendar file is ready. Open it to add the events.'; return; }
+    b.disabled = true; msg.textContent = 'Adding\u2026';
+    try { const r = await ctl.auto(t); msg.textContent = `Added ${r.added} to your Google Calendar${r.skipped ? `, ${r.skipped} were already there` : ''}.`; } catch (ex) { msg.textContent = ex.message; }
+    b.disabled = false;
   });
   const go = (d) => { const n = i + d; if (n >= 0 && n < tiles.length) { i = n; draw(d); } };
   const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); unlockScroll(); };
@@ -354,13 +402,14 @@ function openTileDetail(tiles, start, onOpen, ctl) {
   draw(0);
 }
 // Fills the tile grid: from the saved copy at once, then from the server. apiNotices and apiExtras take the payload and return the server answer.
-function startNotifyLoad(list, apiNotices, apiExtras) {
+function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar) {
   let place = loadPlace(), notices = null, extras = null;
   const tiles = [], ctl = { label: '' };
   const sel = () => selectedId;
   const placeKey = () => (place ? (place.city || `${place.lat},${place.lon}`) : 'birth');
   const cacheKey = () => `${sel()}|${placeKey()}`;
   const extrasPayload = () => ({ kundliId: sel(), ...(place ? { place: place.city ? { city: place.city } : { lat: place.lat, lon: place.lon, tz: place.tz } } : {}) });
+  if (apiCalendar) ctl.auto = (t) => apiCalendar({ ...extrasPayload(), tile: t.key });
   const render = () => {
     tiles.splice(0, tiles.length, ...buildTiles(notices || {}, extras));
     ctl.label = extras?.place?.label || '';
@@ -376,7 +425,6 @@ function startNotifyLoad(list, apiNotices, apiExtras) {
     const before = place;
     place = p;
     savePlace(p);
-    setPlaceAskedOff(true);
     try {
       const x = await apiExtras(extrasPayload());
       if (p?.city && x.place?.source !== 'city') throw new Error('Could not find that city. Try another name.');
@@ -398,11 +446,7 @@ function startNotifyLoad(list, apiNotices, apiExtras) {
       try { const x = await apiExtras(extrasPayload()); extras = x.needsMine ? { sections: [] } : x; saveCache(cacheKey(), notices, extras); render(); }
       catch { if (extras === null) { extras = { sections: [] }; render(); } }
     };
-    const first = loadX();
-    if (!place && !placeAskedOff()) {
-      // Asked once. The prompt can wait on the person, so the birth-place answer is already filling the tiles meanwhile.
-      try { const p = await phonePlace(); place = p; savePlace(p); await first; await loadX(); } catch { setPlaceAskedOff(true); }
-    } else await first;
+    await loadX();
   })();
 }
 
@@ -494,7 +538,7 @@ async function renderList() {
   app.innerHTML = `<div class="wrap wrap--tabs${pickMode ? '' : ' wrap--home'}">
     <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<div class="intro-row"><p class="muted">Add yourself and family, then ask CosmicMath about any of them.</p><button type="button" class="btn-primary btn-small" id="addBtn">+ Add a<br>birth chart</button></div>'}
-    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
+    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(fmtTime12(k.birthTime))} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
     ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Notifications<span class="notify-badge" id="notifyBadge" hidden></span></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
@@ -514,7 +558,7 @@ async function renderList() {
   onLangChange = null;
   wireFooter();
   document.getElementById('notifyToggle')?.addEventListener('click', openNotifications);
-  if (!pickMode) refreshNoticeBadge();
+  if (!pickMode) { refreshNoticeBadge(); autoPlace(); }
   if (pendingDaily) openDailyFromLink();
   if (pendingSky) openSkyFromLink();
   document.getElementById('addBtn')?.addEventListener('click', () => openModal(null, renderList));
@@ -643,7 +687,7 @@ async function renderDetail(kundliId) {
     <div class="pane" data-pane="person">
     <div style="display:flex;gap:8px;margin:8px 0;"><button class="btn-secondary btn-small" id="edit">Edit</button><button class="btn-danger btn-small" id="del">Delete</button></div>
     </div>
-    ${k.timeUnknown ? `<div class="timebanner"><span>${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events, so answers about houses are approximate.` : 'Birth time not known, so answers are approximate until you find it.'}</span><button type="button" class="btn-secondary btn-small" id="rectifyBtn">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></div>` : ''}
+    ${k.timeUnknown ? `<div class="timebanner"><span>${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(fmtTime12(k.birthTime))} from life events, so answers about houses are approximate.` : 'Birth time not known, so answers are approximate until you find it.'}</span><button type="button" class="btn-secondary btn-small" id="rectifyBtn">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></div>` : ''}
 
     <div class="pane" data-pane="ask">
     <div class="panel chat" id="chat">
@@ -1123,7 +1167,7 @@ function unquoteBlank(ans) {
 }
 
 // Android shows a round clock dial for time boxes and each phone's region decides the date order, so dates and times are typed with
-// the slashes and colon added as you go: dd/mm/yyyy and a 24-hour hh:mm. Values still travel as ISO dates and HH:MM.
+// the slashes and colon added as you go: dd/mm/yyyy and a 12-hour hh:mm with AM or PM. Values still travel as ISO dates and HH:MM.
 document.addEventListener('input', (e) => {
   const t = e.target;
   if (!(t instanceof HTMLInputElement)) return;
@@ -1140,6 +1184,12 @@ const dmyFromIso = (iso) => { const m = String(iso || '').match(/^(\d{4})-(\d{2}
 const hmFromText = (v) => { const t = String(v || '').trim(); if (!t) return ''; const m = t.match(/^(\d{2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? t : null; };
 const DMY_ATTRS = 'type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" autocomplete="off" data-dmy';
 const HM_ATTRS = 'type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm" autocomplete="off" data-hm';
+// Times are typed and shown on a 12-hour clock with AM or PM; they still travel to the server as 24-hour HH:MM.
+const hm12 = (hm) => { const m = String(hm || '').match(/^(\d{2}):(\d{2})/); if (!m) return { text: '', ap: 'AM' }; const h = Number(m[1]) % 24; return { text: `${String(h % 12 || 12).padStart(2, '0')}:${m[2]}`, ap: h >= 12 ? 'PM' : 'AM' }; };
+const fmtTime12 = (hm) => { const m = String(hm || '').match(/^(\d{2}):(\d{2})/); if (!m) return ''; const h = Number(m[1]) % 24; return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'pm' : 'am'}`; };
+// '' when empty, HH:MM (24-hour) when valid, null when it is not a real 12-hour time.
+const hmFromText12 = (v, ap) => { const t = String(v || '').trim(); if (!t) return ''; const m = t.match(/^(\d{1,2}):(\d{2})$/); if (!m || Number(m[1]) < 1 || Number(m[1]) > 12 || Number(m[2]) > 59) return null; return `${String((Number(m[1]) % 12) + (ap === 'PM' ? 12 : 0)).padStart(2, '0')}:${m[2]}`; };
+const apSelect = (name, ap, attrs = '') => `<select ${name ? `name="${name}" ` : ''}aria-label="AM or PM" ${attrs}><option value="AM"${ap === 'AM' ? ' selected' : ''}>AM</option><option value="PM"${ap === 'PM' ? ' selected' : ''}>PM</option></select>`;
 
 // '' when empty, the ISO date when valid, null when it is not a real date.
 function isoFromDmy(v) {
@@ -1335,9 +1385,9 @@ function rectResultsHtml(r) {
   if (!r?.windows?.length) return '';
   const applied = r.status === 'applied';
   return `<p class="rect-conf rect-conf--${esc(r.confidence)}"><b>${esc(CONF_TEXT[r.confidence] || '')}.</b> These are the likely rising-sign windows. A remembered date is rarely exact, so treat the result as an estimate.</p>
-    ${r.windows.map((w, i) => `<div class="gem"><h5 class="gem-title">${i === 0 ? 'Most likely: ' : ''}${esc(w.lagna)} rising &middot; ${esc(w.from)} to ${esc(w.to)} &middot; ${w.matchPercent}% fit</h5>
+    ${r.windows.map((w, i) => `<div class="gem"><h5 class="gem-title">${i === 0 ? 'Most likely: ' : ''}${esc(w.lagna)} rising &middot; ${esc(fmtTime12(w.from))} to ${esc(fmtTime12(w.to))} &middot; ${w.matchPercent}% fit</h5>
       ${w.events ? `<ul class="rect-events">${w.events.map((e) => `<li>${esc(e.label)} (${esc(e.date)}): ${esc(e.maha)} / ${esc(e.antar)} period, <b>${esc(e.fit)}</b> fit</li>`).join('')}</ul>` : ''}
-      <div class="rect-use"><input ${HM_ATTRS} value="${esc(w.suggested)}" data-rect-time="${i}" aria-label="Birth time inside this window" /><button type="button" class="btn-primary btn-small" data-rect-use="${i}">${applied && r.appliedTime >= w.from && r.appliedTime <= w.to ? 'Using this time' : 'Use this time'}</button></div></div>`).join('')}`;
+      <div class="rect-use"><span class="hm12"><input ${HM_ATTRS} value="${esc(hm12(w.suggested).text)}" data-rect-time="${i}" aria-label="Birth time inside this window" />${apSelect('', hm12(w.suggested).ap, `data-rect-ap="${i}"`)}</span><button type="button" class="btn-primary btn-small" data-rect-use="${i}">${applied && r.appliedTime >= w.from && r.appliedTime <= w.to ? 'Using this time' : 'Use this time'}</button></div></div>`).join('')}`;
 }
 
 async function openRectify(kundliId) {
@@ -1394,8 +1444,8 @@ async function openRectify(kundliId) {
   overlay.querySelector('#rectResults').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-rect-use]');
     if (!b || !current) return;
-    const time = hmFromText(overlay.querySelector(`[data-rect-time="${b.dataset.rectUse}"]`).value);
-    if (!time) { err.textContent = 'Please type the birth time as hh:mm, 24-hour.'; err.hidden = false; return; }
+    const time = hmFromText12(overlay.querySelector(`[data-rect-time="${b.dataset.rectUse}"]`).value, overlay.querySelector(`[data-rect-ap="${b.dataset.rectUse}"]`).value);
+    if (!time) { err.textContent = 'Please type the birth time as hh:mm and choose AM or PM.'; err.hidden = false; return; }
     b.disabled = true; b.textContent = 'Saving…';
     try { const done = await guarded(() => call('kundliPublic_rectifyApply', { kundliId, time })); if (!done) { close(); return; } finish(); } catch (ex) { err.textContent = ex.message; err.hidden = false; b.disabled = false; b.textContent = 'Use this time'; }
   });
@@ -1446,7 +1496,7 @@ function openModal(k, done) {
       <div class="row">
         <label>Date of birth <input ${DMY_ATTRS} name="birthDate" required value="${dmyFromIso(k?.birthDate)}" /></label>
         <div>
-          <label>Time of birth <input ${HM_ATTRS} name="birthTime" ${k?.timeUnknown ? 'disabled' : 'required'} value="${esc(k?.timeUnknown ? '' : k?.birthTime || '')}" /></label>
+          <label>Time of birth <span class="hm12"><input ${HM_ATTRS} name="birthTime" ${k?.timeUnknown ? 'disabled' : 'required'} value="${esc(k?.timeUnknown ? '' : hm12(k?.birthTime).text)}" />${apSelect('birthAp', hm12(k?.birthTime).ap, k?.timeUnknown ? 'disabled' : '')}</span></label>
           <label class="tu"><input type="checkbox" name="timeUnknown" ${k?.timeUnknown ? 'checked' : ''} style="width:auto;" /> (time not known)</label>
         </div>
       </div>
@@ -1465,7 +1515,7 @@ function openModal(k, done) {
   const tu = overlay.querySelector('input[name="timeUnknown"]');
   const timeInput = overlay.querySelector('input[name="birthTime"]');
   tu.addEventListener('change', () => {
-    timeInput.disabled = tu.checked; timeInput.required = !tu.checked; if (tu.checked) timeInput.value = '';
+    timeInput.disabled = tu.checked; timeInput.required = !tu.checked; if (tu.checked) timeInput.value = ''; overlay.querySelector('select[name="birthAp"]').disabled = tu.checked;
     overlay.querySelector('#timeHint').textContent = tu.checked ? 'We will help you find the birth time from life events.' : 'The exact birth time matters: the ascendant changes about every two hours.';
   });
   overlay.querySelector('#f').addEventListener('submit', async (e) => {
@@ -1473,9 +1523,9 @@ function openModal(k, done) {
     const fd = new FormData(e.target);
     const errEl = overlay.querySelector('#ferr');
     errEl.hidden = true;
-    const birthIso = isoFromDmy(fd.get('birthDate')), birthHm = hmFromText(fd.get('birthTime'));
+    const birthIso = isoFromDmy(fd.get('birthDate')), birthHm = hmFromText12(fd.get('birthTime'), fd.get('birthAp'));
     if (!birthIso) { errEl.textContent = 'Please type the date of birth as dd/mm/yyyy.'; errEl.hidden = false; return; }
-    if (birthHm === null || (!birthHm && fd.get('timeUnknown') !== 'on')) { errEl.textContent = 'Please type the time of birth as hh:mm, 24-hour, or tick "time not known".'; errEl.hidden = false; return; }
+    if (birthHm === null || (!birthHm && fd.get('timeUnknown') !== 'on')) { errEl.textContent = 'Please type the time of birth as hh:mm, choose AM or PM, or tick "time not known".'; errEl.hidden = false; return; }
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; btn.textContent = 'Finding place…';
     try {

@@ -446,3 +446,17 @@ body.locked { overflow: hidden; }
 .ntile-for { margin: 0 0 8px; font-size: 13px; color: var(--ink-muted); }
 .ntile-who b, .ntile-for b { color: var(--ink); }
 .ntile-loc-form[hidden], .ntile-loc-err[hidden] { display: none; }
+
+/* A time box with its AM or PM choice beside it. */
+.hm12 { display: flex; gap: 8px; align-items: center; }
+.hm12 input { flex: 1; min-width: 0; }
+.hm12 select { flex: none; width: auto; min-width: 72px; }
+
+/* Add the days and times of a tile to the calendar. */
+.ntile-cal { margin: 16px 0 4px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ntile-cal-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ntile-cal-btn { flex: 1 1 160px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.ntile-cal-btn--main { background: var(--accent, #1F5F5B); border-color: var(--accent, #1F5F5B); color: var(--on-accent, #fff); font-weight: 600; }
+.ntile-cal-btn:disabled { opacity: 0.6; cursor: default; }
+.ntile-cal-msg { margin: 8px 0 0; font-size: 13px; }
+.ntile-cal-msg[hidden] { display: none; }
