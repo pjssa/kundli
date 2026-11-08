@@ -460,3 +460,6 @@ body.locked { overflow: hidden; }
 .ntile-cal-btn:disabled { opacity: 0.6; cursor: default; }
 .ntile-cal-msg { margin: 8px 0 0; font-size: 13px; }
 .ntile-cal-msg[hidden] { display: none; }
+
+.ntile-all { margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
+.ntile-all > p.muted { margin: 0 0 6px; font-size: 13px; }

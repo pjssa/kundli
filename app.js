@@ -417,10 +417,21 @@ function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar) {
   const cacheKey = () => `${sel()}|${placeKey()}`;
   const extrasPayload = () => ({ kundliId: sel(), ...(place ? { place: place.city ? { city: place.city } : { lat: place.lat, lon: place.lon, tz: place.tz } } : {}) });
   if (apiCalendar) ctl.auto = (t) => apiCalendar({ ...extrasPayload(), tile: t.key });
+  // One button for every tile at once, shown once the extra sections have loaded so the count is complete.
+  const allEvents = () => { const m = new Map(); for (const t of tiles) for (const e of t.events || []) m.set(e.id, e); return [...m.values()]; };
+  const allCalHtml = () => { const n = extras === null ? 0 : allEvents().length; return n ? `<div class="ntile-all"><p class="muted">${n} events from all the tiles for your calendar, each with a reminder 30 minutes before.</p><div class="ntile-cal-row">${apiCalendar ? '<button type="button" class="ntile-cal-btn ntile-cal-btn--main" data-all="auto">Add everything to my Google Calendar</button>' : ''}<button type="button" class="ntile-cal-btn" data-all="ics">\u{1F4C5} Add everything to calendar${apiCalendar ? ' (file)' : ''}</button></div><p class="ntile-cal-msg" hidden></p></div>` : ''; };
   const render = () => {
     tiles.splice(0, tiles.length, ...buildTiles(notices || {}, extras));
     ctl.label = extras?.place?.label || '';
-    list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
+    list.innerHTML = allCalHtml() + tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
+    list.querySelectorAll('[data-all]').forEach((b) => b.addEventListener('click', async () => {
+      const msg = list.querySelector('.ntile-all .ntile-cal-msg');
+      msg.hidden = false;
+      if (b.dataset.all === 'ics') { downloadIcs(allEvents(), tiles[0]?.person); msg.textContent = 'The calendar file is ready. Open it to add the events.'; return; }
+      b.disabled = true; msg.textContent = 'Adding everything\u2026 this can take a little while.';
+      try { const r = await apiCalendar({ ...extrasPayload(), tile: 'all' }); msg.textContent = `Added ${r.added} to your Google Calendar${r.skipped ? `, ${r.skipped} were already there` : ''}.`; } catch (ex) { msg.textContent = ex.message; }
+      b.disabled = false;
+    }));
     list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
       if (!t.noticeId || !t.unseen) return;
       markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
