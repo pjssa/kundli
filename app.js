@@ -235,11 +235,63 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
-// The old debts the chart carries (the server decides which, from fixed rules), under the notices. Not counted in the badge, since they are not news.
-function debtsHtml(debts) {
-  if (!Array.isArray(debts)) return '';
-  return `<h3 class="notif-h">Old debts in your chart</h3>${debts.length ? debts.map((d) => `<details class="notice notice--debt"><summary>${esc(d.title)}${d.activeNow ? ' <span class="debt-now">running now</span>' : ''}</summary><p>${esc(d.why)}</p><p><b>Affects:</b> ${esc(d.areasText)}</p><p><b>Remedy:</b> ${esc(d.remedy)}</p></details>`).join('') : '<p class="muted">No clear old debt shows in your chart.</p>'}`;
+// Notifications are shown as square tiles. Tapping one opens it in a popup, and in that popup a swipe from right to left moves to the next tile (left to right, back).
+const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '\u2696\uFE0F', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '\u23F0', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}', dates: '\u{1F382}' };
+function buildTiles(r, x) {
+  const seen = seenNotices();
+  const tiles = [];
+  for (const n of (r.items || [])) {
+    if (!(Date.parse(n.validUntil) > Date.now())) continue;
+    const lines = String(n.body).split('\n').filter(Boolean);
+    tiles.push({ noticeId: n.id, icon: TILE_ICONS[n.kind] || '\u{1F514}', title: n.title, hint: lines[0] || '', blocks: [{ lines }], unseen: !seen.has(n.id) });
+  }
+  if (Array.isArray(r.debts)) {
+    tiles.push({ icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in your chart` : 'None clear in your chart',
+      blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in your chart.'] }] });
+  }
+  for (const s of (x?.sections || [])) tiles.push({ icon: TILE_ICONS[s.id] || '\u2728', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' \u00B7 '), intro: s.intro, blocks: s.items });
+  return tiles;
 }
+function tilesGridHtml(tiles) {
+  return `<div class="ntiles">${tiles.map((t, i) => `<button type="button" class="ntile" data-i="${i}"><span class="ntile-icon" aria-hidden="true">${t.icon}</span><b>${esc(t.title)}</b><small>${esc(t.hint)}</small>${t.unseen ? '<span class="ntile-dot" aria-label="New"></span>' : ''}</button>`).join('')}</div>`;
+}
+function openTileDetail(tiles, start, onOpen) {
+  let i = start;
+  const overlay = document.createElement('div');
+  overlay.className = 'ntile-overlay';
+  overlay.innerHTML = `<div class="ntile-panel" role="dialog" aria-modal="true"><div class="ntile-head"><button type="button" class="ntile-nav" data-d="-1" aria-label="Previous">&lsaquo;</button><h2 class="ntile-title"></h2><button type="button" class="ntile-nav" data-d="1" aria-label="Next">&rsaquo;</button></div><div class="ntile-body"></div><div class="ntile-foot"><span class="ntile-count"></span><button type="button" class="btn-primary ntile-close">Close</button></div></div>`;
+  document.body.appendChild(overlay);
+  const q = (sel) => overlay.querySelector(sel), body = q('.ntile-body');
+  const draw = (dir) => {
+    const t = tiles[i];
+    q('.ntile-title').textContent = `${t.icon} ${t.title}`;
+    body.innerHTML = (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
+    body.scrollTop = 0;
+    q('.ntile-count').textContent = `${i + 1} of ${tiles.length}`;
+    overlay.querySelectorAll('.ntile-nav').forEach((b) => { b.disabled = (Number(b.dataset.d) < 0 && i === 0) || (Number(b.dataset.d) > 0 && i === tiles.length - 1); });
+    body.classList.remove('ntile-from-right', 'ntile-from-left'); void body.offsetWidth;
+    if (dir) body.classList.add(dir > 0 ? 'ntile-from-right' : 'ntile-from-left');
+    onOpen?.(t, i);
+  };
+  const go = (d) => { const n = i + d; if (n >= 0 && n < tiles.length) { i = n; draw(d); } };
+  const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
+  const onKey = (e) => { if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  overlay.querySelectorAll('.ntile-nav').forEach((b) => b.addEventListener('click', () => go(Number(b.dataset.d))));
+  q('.ntile-close').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  let x0 = null, y0 = null;
+  const panel = q('.ntile-panel');
+  panel.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  panel.addEventListener('touchend', (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  draw(0);
+}
+
 // The Notifications button in the pinned bottom row (beside Feedback) opens one popup that holds everything: the notices still valid, the single
 // on/off switch for every notification (the daily forecast and the Amavasya, Purnima and grahan reminders all use the one push subscription of this device),
 // and Send now.
@@ -291,13 +343,27 @@ function openNotifications(hasMine) {
     $('#nTest').onclick = () => run($('#nTest'), () => call('kundliPublic_pushTest'));
   };
   draw();
+  const list = $('#nList');
+  let notices = null, extras = null;
+  const render = () => {
+    const tiles = buildTiles(notices || {}, extras);
+    list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
+    list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
+      if (!t.noticeId || !t.unseen) return;
+      markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
+      list.querySelector(`.ntile[data-i="${idx}"] .ntile-dot`)?.remove();
+      drawNoticeBadge(tiles.filter((x) => x.noticeId && x.unseen).length);
+    })));
+  };
   (async () => {
-    if (!hasMine) { $('#nList').innerHTML = '<p class="muted">First tick &ldquo;This is me&rdquo; on your own chart to see your notifications.</p>'; return; }
+    if (!hasMine) { list.innerHTML = '<p class="muted">First tick &ldquo;This is me&rdquo; on your own chart to see your notifications.</p>'; return; }
     try {
-      const r = await call('kundliPublic_notices');
-      $('#nList').innerHTML = (r.needsMine ? '<p class="muted">Nothing to show right now.</p>' : (noticesHtml(r.items) || '<p class="muted">No new notice right now.</p>') + debtsHtml(r.debts));
-      if (!r.needsMine) { markNoticesSeen((r.items || []).filter((n) => Date.parse(n.validUntil) > Date.now())); drawNoticeBadge(0); }
-    } catch (e) { $('#nList').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+      notices = await call('kundliPublic_notices');
+      if (notices.needsMine) { list.innerHTML = '<p class="muted">Nothing to show right now.</p>'; return; }
+      render();
+    } catch (e) { list.innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+    try { extras = await call('kundliPublic_notifyExtras'); if (extras.needsMine) extras = { sections: [] }; } catch { extras = { sections: [] }; }
+    render();
   })();
 }
 
@@ -358,12 +424,6 @@ async function openSkyFromLink() {
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'daily') showDailyPopup(e.data); });
 
-// The list inside the Notifications popup: today's forecast and any Amavasya, Purnima or grahan that is still valid. The server decides what is valid
-// (forecast to midnight, an event from the day before to 11 pm on the day); the time is checked again here in case the popup was opened long ago.
-function noticesHtml(items) {
-  const live = (items || []).filter((n) => Date.parse(n.validUntil) > Date.now());
-  return live.map((n, i) => `<details class="notice notice--${esc(n.kind)}"${i < 2 ? ' open' : ''}><summary>${esc(n.title)}</summary>${String(n.body).split('\n').filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join('')}</details>`).join('');
-}
 async function renderList() {
   peopleCache = null;
   detailId = '';
