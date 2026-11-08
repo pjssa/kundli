@@ -400,3 +400,7 @@ body.locked { overflow: hidden; }
 
 .notif-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .notif-help { margin: 4px 0 10px; font-size: 13px; }
+
+/* Count of unseen notices on the Notifications button. */
+.notify-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px; border-radius: 10px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; vertical-align: middle; }
+.notify-badge[hidden] { display: none; }

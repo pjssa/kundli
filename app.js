@@ -238,6 +238,27 @@ async function disablePush() {
 // The Notifications button in the pinned bottom row (beside Feedback) opens one popup that holds everything: the notices still valid, the single
 // on/off switch for every notification (the daily forecast and the Amavasya, Purnima and grahan reminders all use the one push subscription of this device),
 // and Send now.
+// The red number on the Notifications button: notices that are valid now and have not been opened yet on this device. Opening the popup marks what it shows as seen.
+// Kept in this browser only; it is a convenience, so a cleared or blocked store just shows every valid notice as new again.
+const SEEN_KEY = 'cm_seen_notices';
+const seenNotices = () => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); } };
+function markNoticesSeen(items) {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...new Set([...seenNotices(), ...items.map((n) => n.id)])].slice(-40))); } catch { /* storage unavailable */ }
+}
+function drawNoticeBadge(count) {
+  const badge = document.getElementById('notifyBadge'), btn = document.getElementById('notifyToggle');
+  if (!badge || !btn) return;
+  badge.hidden = !count; badge.textContent = count > 9 ? '9+' : String(count);
+  btn.setAttribute('aria-label', count ? `Notifications, ${count} new` : 'Notifications');
+}
+async function refreshNoticeBadge(hasMine) {
+  if (!hasMine) return;
+  try {
+    const r = await call('kundliPublic_notices');
+    const seen = seenNotices();
+    drawNoticeBadge(r.needsMine ? 0 : (r.items || []).filter((n) => Date.parse(n.validUntil) > Date.now() && !seen.has(n.id)).length);
+  } catch { /* no badge if it cannot be checked */ }
+}
 function openNotifications(hasMine) {
   document.getElementById('notifPopup')?.remove();
   const overlay = document.createElement('div');
@@ -270,6 +291,7 @@ function openNotifications(hasMine) {
     try {
       const r = await call('kundliPublic_notices');
       $('#nList').innerHTML = (r.needsMine ? '' : noticesHtml(r.items)) || '<p class="muted">Nothing to show right now.</p>';
+      if (!r.needsMine) { markNoticesSeen((r.items || []).filter((n) => Date.parse(n.validUntil) > Date.now())); drawNoticeBadge(0); }
     } catch (e) { $('#nList').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
   })();
 }
@@ -360,7 +382,7 @@ async function renderList() {
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<div class="intro-row"><p class="muted">Add yourself and family, then ask CosmicMath about any of them.</p><button type="button" class="btn-primary btn-small" id="addBtn">+ Add a<br>birth chart</button></div>'}
     ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
-    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Notifications</button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
+    ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Notifications<span class="notify-badge" id="notifyBadge" hidden></span></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
   </div>`;
   wireTabs();
@@ -378,6 +400,7 @@ async function renderList() {
   onLangChange = null;
   wireFooter();
   document.getElementById('notifyToggle')?.addEventListener('click', () => openNotifications(items.some((k) => k.isMine)));
+  if (!pickMode) refreshNoticeBadge(items.some((k) => k.isMine));
   askWhichIsMine(items);
   if (pendingDaily) openDailyFromLink();
   if (pendingSky) openSkyFromLink();
