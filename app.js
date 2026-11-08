@@ -235,37 +235,85 @@ async function disablePush() {
   try { await call('kundliPublic_pushUnsubscribe', { endpoint: sub.endpoint }); } finally { await sub.unsubscribe(); }
 }
 
+// The red number on the Notifications button: notices that are valid now and have not been opened yet on this device, for the person chosen on Home. Opening a notice tile
+// marks it as seen. Kept in this browser only; it is a convenience, so a cleared or blocked store just shows every valid notice as new again.
+const SEEN_KEY = 'cm_seen_notices';
+const seenNotices = () => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); } };
+function markNoticesSeen(items) {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...new Set([...seenNotices(), ...items.map((n) => n.id)])].slice(-40))); } catch { /* storage unavailable */ }
+}
+function drawNoticeBadge(count) {
+  const badge = document.getElementById('notifyBadge'), btn = document.getElementById('notifyToggle');
+  if (!badge || !btn) return;
+  badge.hidden = !count; badge.textContent = count > 9 ? '9+' : String(count);
+  btn.setAttribute('aria-label', count ? `Notifications, ${count} new` : 'Notifications');
+}
+async function refreshNoticeBadge() {
+  if (!selectedId) { drawNoticeBadge(0); return; }
+  try {
+    const r = await call('kundliPublic_notices', { kundliId: selectedId });
+    const seen = seenNotices();
+    drawNoticeBadge(r.needsMine ? 0 : (r.items || []).filter((n) => Date.parse(n.validUntil) > Date.now() && !seen.has(n.id)).length);
+  } catch { /* no badge if it cannot be checked */ }
+}
 // Notifications are shown as square tiles. Tapping one opens it in a popup, and in that popup a swipe from right to left moves to the next tile (left to right, back).
-const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '\u2696\uFE0F', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '\u23F0', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}', dates: '\u{1F382}' };
+// The tiles follow the person chosen on Home, like Ask, Check and Chart. The last answer is kept on this device (stale-while-revalidate) so the popup fills at once and
+// then refreshes. Times in Today, Nazar and Good time use the phone's location, or a city typed in, or the birth place.
+const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '⚖️', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '⏰', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}' };
+const LOC_KEY = 'cm_place', CACHE_KEY = 'cm_notif_cache';
+const loadPlace = () => { try { return JSON.parse(localStorage.getItem(LOC_KEY) || 'null'); } catch { return null; } };
+const savePlace = (p) => { try { if (p) localStorage.setItem(LOC_KEY, JSON.stringify(p)); else localStorage.removeItem(LOC_KEY); } catch { /* storage unavailable */ } };
+const placeAskedOff = () => { try { return localStorage.getItem(LOC_KEY + '_off') === '1'; } catch { return false; } };
+const setPlaceAskedOff = (v) => { try { if (v) localStorage.setItem(LOC_KEY + '_off', '1'); else localStorage.removeItem(LOC_KEY + '_off'); } catch { /* storage unavailable */ } };
+const istDay = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+const loadCache = (key) => { try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return c && c.key === key && c.day === istDay() ? c : null; } catch { return null; } };
+const saveCache = (key, notices, extras) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ key, day: istDay(), notices, extras })); } catch { /* storage unavailable */ } };
+function phonePlace() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('This device cannot share its location. Type a city instead.')); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: Number(pos.coords.latitude.toFixed(4)), lon: Number(pos.coords.longitude.toFixed(4)), tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+      (err) => reject(new Error(err.code === 1 ? 'Location is blocked for this site. Allow it in your browser or phone settings, or type a city.' : 'Could not get your location. Type a city instead.')),
+      { timeout: 8000, maximumAge: 600000 });
+  });
+}
+// The page behind a popup must not scroll with it. Counted, since the tile popup opens on top of the notifications popup.
+let scrollLocks = 0;
+function lockScroll() { if (scrollLocks++ === 0) { document.documentElement.style.overflow = 'hidden'; document.body.style.overflow = 'hidden'; } }
+function unlockScroll() { if (scrollLocks > 0 && --scrollLocks === 0) { document.documentElement.style.overflow = ''; document.body.style.overflow = ''; } }
 function buildTiles(r, x) {
   const seen = seenNotices();
   const tiles = [];
+  const person = x?.person || r.person || '';
   for (const n of (r.items || [])) {
     if (!(Date.parse(n.validUntil) > Date.now())) continue;
     const lines = String(n.body).split('\n').filter(Boolean);
     tiles.push({ noticeId: n.id, icon: TILE_ICONS[n.kind] || '\u{1F514}', title: n.title, hint: lines[0] || '', blocks: [{ lines }], unseen: !seen.has(n.id) });
   }
   if (Array.isArray(r.debts)) {
-    tiles.push({ icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in your chart` : 'None clear in your chart',
-      blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in your chart.'] }] });
+    tiles.push({ icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in the chart` : 'None clear in the chart',
+      blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in this chart.'] }] });
   }
-  for (const s of (x?.sections || [])) tiles.push({ icon: TILE_ICONS[s.id] || '\u2728', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' \u00B7 '), intro: s.intro, blocks: s.items });
+  for (const s of (x?.sections || [])) tiles.push({ icon: TILE_ICONS[s.id] || '✨', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' · '), intro: s.intro, blocks: s.items, locatable: ['today', 'goodtime', 'nazar'].includes(s.id) });
+  tiles.forEach((t) => { t.person = person; });
   return tiles;
 }
 function tilesGridHtml(tiles) {
-  return `<div class="ntiles">${tiles.map((t, i) => `<button type="button" class="ntile" data-i="${i}"><span class="ntile-icon" aria-hidden="true">${t.icon}</span><b>${esc(t.title)}</b><small>${esc(t.hint)}</small>${t.unseen ? '<span class="ntile-dot" aria-label="New"></span>' : ''}</button>`).join('')}</div>`;
+  return `${tiles[0]?.person ? `<p class="ntile-who">Notifications for <b>${esc(tiles[0].person)}</b></p>` : ''}<div class="ntiles">${tiles.map((t, i) => `<button type="button" class="ntile" data-i="${i}"><span class="ntile-icon" aria-hidden="true">${t.icon}</span><b>${esc(t.title)}</b><small>${esc(t.hint)}</small>${t.unseen ? '<span class="ntile-dot" aria-label="New"></span>' : ''}</button>`).join('')}</div>`;
 }
-function openTileDetail(tiles, start, onOpen) {
+function openTileDetail(tiles, start, onOpen, ctl) {
   let i = start;
   const overlay = document.createElement('div');
   overlay.className = 'ntile-overlay';
   overlay.innerHTML = `<div class="ntile-panel" role="dialog" aria-modal="true"><div class="ntile-head"><button type="button" class="ntile-nav" data-d="-1" aria-label="Previous">&lsaquo;</button><h2 class="ntile-title"></h2><button type="button" class="ntile-nav" data-d="1" aria-label="Next">&rsaquo;</button></div><div class="ntile-body"></div><div class="ntile-foot"><span class="ntile-count"></span><button type="button" class="btn-primary ntile-close">Close</button></div></div>`;
   document.body.appendChild(overlay);
+  lockScroll();
   const q = (sel) => overlay.querySelector(sel), body = q('.ntile-body');
+  const locHtml = () => `<div class="ntile-loc"><span>\u{1F4CD} Times for <b>${esc(ctl.label || 'the birth place')}</b></span><button type="button" class="ntile-loc-btn" data-act="toggle">Change</button></div><div class="ntile-loc-form" hidden><button type="button" class="ntile-loc-btn" data-act="phone">Use my phone location</button><div class="ntile-loc-city"><input type="text" placeholder="Type a city" aria-label="City" /><button type="button" class="ntile-loc-btn" data-act="city">Set</button></div><button type="button" class="ntile-loc-btn" data-act="birth">Use the birth place</button><p class="ntile-loc-err" hidden></p></div>`;
   const draw = (dir) => {
     const t = tiles[i];
     q('.ntile-title').textContent = `${t.icon} ${t.title}`;
-    body.innerHTML = (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
+    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
     body.scrollTop = 0;
     q('.ntile-count').textContent = `${i + 1} of ${tiles.length}`;
     overlay.querySelectorAll('.ntile-nav').forEach((b) => { b.disabled = (Number(b.dataset.d) < 0 && i === 0) || (Number(b.dataset.d) > 0 && i === tiles.length - 1); });
@@ -273,9 +321,23 @@ function openTileDetail(tiles, start, onOpen) {
     if (dir) body.classList.add(dir > 0 ? 'ntile-from-right' : 'ntile-from-left');
     onOpen?.(t, i);
   };
+  body.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b || !ctl) return;
+    const form = body.querySelector('.ntile-loc-form'), err = body.querySelector('.ntile-loc-err');
+    if (b.dataset.act === 'toggle') { form.hidden = !form.hidden; return; }
+    err.hidden = true; b.disabled = true;
+    try {
+      let p = null;
+      if (b.dataset.act === 'phone') p = await phonePlace();
+      else if (b.dataset.act === 'city') { const v = body.querySelector('.ntile-loc-city input').value.trim(); if (v.length < 2) throw new Error('Type a city name.'); p = { city: v }; }
+      await ctl.onPlace(p);
+      draw(0);
+    } catch (ex) { err.textContent = ex.message; err.hidden = false; b.disabled = false; }
+  });
   const go = (d) => { const n = i + d; if (n >= 0 && n < tiles.length) { i = n; draw(d); } };
-  const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
-  const onKey = (e) => { if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'Escape') close(); };
+  const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); unlockScroll(); };
+  const onKey = (e) => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
   overlay.querySelectorAll('.ntile-nav').forEach((b) => b.addEventListener('click', () => go(Number(b.dataset.d))));
   q('.ntile-close').addEventListener('click', close);
@@ -291,36 +353,66 @@ function openTileDetail(tiles, start, onOpen) {
   }, { passive: true });
   draw(0);
 }
+// Fills the tile grid: from the saved copy at once, then from the server. apiNotices and apiExtras take the payload and return the server answer.
+function startNotifyLoad(list, apiNotices, apiExtras) {
+  let place = loadPlace(), notices = null, extras = null;
+  const tiles = [], ctl = { label: '' };
+  const sel = () => selectedId;
+  const placeKey = () => (place ? (place.city || `${place.lat},${place.lon}`) : 'birth');
+  const cacheKey = () => `${sel()}|${placeKey()}`;
+  const extrasPayload = () => ({ kundliId: sel(), ...(place ? { place: place.city ? { city: place.city } : { lat: place.lat, lon: place.lon, tz: place.tz } } : {}) });
+  const render = () => {
+    tiles.splice(0, tiles.length, ...buildTiles(notices || {}, extras));
+    ctl.label = extras?.place?.label || '';
+    list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
+    list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
+      if (!t.noticeId || !t.unseen) return;
+      markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
+      list.querySelector(`.ntile[data-i="${idx}"] .ntile-dot`)?.remove();
+      drawNoticeBadge(tiles.filter((x) => x.noticeId && x.unseen).length);
+    }, ctl)));
+  };
+  ctl.onPlace = async (p) => {
+    const before = place;
+    place = p;
+    savePlace(p);
+    setPlaceAskedOff(true);
+    try {
+      const x = await apiExtras(extrasPayload());
+      if (p?.city && x.place?.source !== 'city') throw new Error('Could not find that city. Try another name.');
+      extras = x.needsMine ? { sections: [] } : x;
+      saveCache(cacheKey(), notices, extras);
+      render();
+    } catch (err) { place = before; savePlace(before); throw err; }
+  };
+  const cached = sel() ? loadCache(cacheKey()) : null;
+  if (cached) { notices = cached.notices; extras = cached.extras; render(); }
+  (async () => {
+    if (!sel()) { list.innerHTML = '<p class="muted">Choose a person on the Home screen to see their notifications.</p>'; return; }
+    try {
+      const n = await apiNotices({ kundliId: sel() });
+      if (n.needsMine) { list.innerHTML = '<p class="muted">Choose a person on the Home screen to see their notifications.</p>'; return; }
+      notices = n; render();
+    } catch (e) { if (!notices) { list.innerHTML = `<p class="muted">Could not load: ${esc(e.message)}</p>`; return; } }
+    const loadX = async () => {
+      try { const x = await apiExtras(extrasPayload()); extras = x.needsMine ? { sections: [] } : x; saveCache(cacheKey(), notices, extras); render(); }
+      catch { if (extras === null) { extras = { sections: [] }; render(); } }
+    };
+    const first = loadX();
+    if (!place && !placeAskedOff()) {
+      // Asked once. The prompt can wait on the person, so the birth-place answer is already filling the tiles meanwhile.
+      try { const p = await phonePlace(); place = p; savePlace(p); await first; await loadX(); } catch { setPlaceAskedOff(true); }
+    } else await first;
+  })();
+}
 
-// The Notifications button in the pinned bottom row (beside Feedback) opens one popup that holds everything: the notices still valid, the single
-// on/off switch for every notification (the daily forecast and the Amavasya, Purnima and grahan reminders all use the one push subscription of this device),
-// and Send now.
-// The red number on the Notifications button: notices that are valid now and have not been opened yet on this device. Opening the popup marks what it shows as seen.
-// Kept in this browser only; it is a convenience, so a cleared or blocked store just shows every valid notice as new again.
-const SEEN_KEY = 'cm_seen_notices';
-const seenNotices = () => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); } };
-function markNoticesSeen(items) {
-  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...new Set([...seenNotices(), ...items.map((n) => n.id)])].slice(-40))); } catch { /* storage unavailable */ }
-}
-function drawNoticeBadge(count) {
-  const badge = document.getElementById('notifyBadge'), btn = document.getElementById('notifyToggle');
-  if (!badge || !btn) return;
-  badge.hidden = !count; badge.textContent = count > 9 ? '9+' : String(count);
-  btn.setAttribute('aria-label', count ? `Notifications, ${count} new` : 'Notifications');
-}
-async function refreshNoticeBadge(hasMine) {
-  if (!hasMine) return;
-  try {
-    const r = await call('kundliPublic_notices');
-    const seen = seenNotices();
-    drawNoticeBadge(r.needsMine ? 0 : (r.items || []).filter((n) => Date.parse(n.validUntil) > Date.now() && !seen.has(n.id)).length);
-  } catch { /* no badge if it cannot be checked */ }
-}
-function openNotifications(hasMine) {
+// The Notifications button in the pinned bottom row (beside Feedback) opens one popup that holds everything: the tiles for the person chosen on Home, the single on/off switch
+// for every notification (the daily forecast and the Amavasya, Purnima and grahan reminders all use the one push subscription of this device), and Send now.
+function openNotifications() {
   document.getElementById('notifPopup')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'notifPopup';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:40;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;overscroll-behavior:contain;z-index:40;';
   overlay.innerHTML = `<div class="panel" role="dialog" aria-modal="true" style="max-width:480px;width:100%;margin-top:24px;"><h2 style="margin:0 0 10px;">Notifications</h2>
     <div class="notif-switch"><span class="muted" id="nStatus">Checking&hellip;</span><button type="button" class="btn-secondary btn-small" id="nToggle" hidden></button></div>
     <p class="muted notif-help">One switch for all of them: the daily forecast and the Amavasya, Purnima and grahan reminders.</p>
@@ -328,9 +420,11 @@ function openNotifications(hasMine) {
     <div id="nList"><p class="muted">Loading&hellip;</p></div>
     <div class="actions"><button type="button" class="btn-secondary" id="nTest" hidden>Send now</button><button type="button" class="btn-primary" id="nClose">Close</button></div></div>`;
   document.body.appendChild(overlay);
+  lockScroll();
   const $ = (id) => overlay.querySelector(id);
-  $('#nClose').addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const closeIt = () => { overlay.remove(); unlockScroll(); };
+  $('#nClose').addEventListener('click', closeIt);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeIt(); });
   const show = (m) => { $('#nErr').hidden = !m; $('#nErr').textContent = m || ''; };
   const run = async (el, fn) => { show(''); el.disabled = true; try { await fn(); } catch (e) { show(e.message); } el.disabled = false; };
   const draw = async () => {
@@ -343,55 +437,7 @@ function openNotifications(hasMine) {
     $('#nTest').onclick = () => run($('#nTest'), () => call('kundliPublic_pushTest'));
   };
   draw();
-  const list = $('#nList');
-  let notices = null, extras = null;
-  const render = () => {
-    const tiles = buildTiles(notices || {}, extras);
-    list.innerHTML = tilesGridHtml(tiles) + (extras === null ? '<p class="muted">Loading more&hellip;</p>' : '');
-    list.querySelectorAll('.ntile').forEach((b) => b.addEventListener('click', () => openTileDetail(tiles, Number(b.dataset.i), (t, idx) => {
-      if (!t.noticeId || !t.unseen) return;
-      markNoticesSeen([{ id: t.noticeId }]); t.unseen = false;
-      list.querySelector(`.ntile[data-i="${idx}"] .ntile-dot`)?.remove();
-      drawNoticeBadge(tiles.filter((x) => x.noticeId && x.unseen).length);
-    })));
-  };
-  (async () => {
-    if (!hasMine) { list.innerHTML = '<p class="muted">First tick &ldquo;This is me&rdquo; on your own chart to see your notifications.</p>'; return; }
-    try {
-      notices = await call('kundliPublic_notices');
-      if (notices.needsMine) { list.innerHTML = '<p class="muted">Nothing to show right now.</p>'; return; }
-      render();
-    } catch (e) { list.innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
-    try { extras = await call('kundliPublic_notifyExtras'); if (extras.needsMine) extras = { sections: [] }; } catch { extras = { sections: [] }; }
-    render();
-  })();
-}
-
-// Asked once each time the app is opened until a chart is marked as the person's own; "Not now" only silences it for this visit.
-let askedMine = false;
-// One chart can only be the signed-in person's own, so it is marked without asking, and its tile tick stays locked
-// (see renderList). With two or more charts the person picks below, or ticks one on the list.
-async function autoMarkMine(k) {
-  try { await call('kundliPublic_setMine', { kundliId: k.kundliId, mine: true }); renderList(); } catch { /* the tick on the tile still works */ }
-}
-function askWhichIsMine(items) {
-  if (askedMine || !items.length || items.some((k) => k.isMine)) return;
-  askedMine = true;
-  if (items.length === 1) { autoMarkMine(items[0]); return; }
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;z-index:30;';
-  overlay.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin-top:24px;"><h2>Which one is you?</h2>
-    <form id="mineForm"><p class="muted">Mark your own chart: your daily 7 am forecast is based on it.</p>
-      ${items.map((k, i) => `<label class="tu" style="display:block;margin:6px 0;"><input type="radio" name="mine" value="${esc(k.kundliId)}" ${i === 0 ? 'checked' : ''} style="width:auto;" /> ${esc(k.name)}</label>`).join('')}
-      <p class="error" id="mineErr" hidden></p>
-      <div class="actions"><button type="button" class="btn-secondary" id="mineLater">Not now</button><button type="submit" class="btn-primary">This is me</button></div></form></div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#mineLater').addEventListener('click', () => overlay.remove());
-  overlay.querySelector('#mineForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try { await call('kundliPublic_setMine', { kundliId: new FormData(e.target).get('mine'), mine: true }); overlay.remove(); renderList(); }
-    catch (err) { const el = overlay.querySelector('#mineErr'); el.textContent = err.message; el.hidden = false; }
-  });
+  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p));
 }
 
 // The 7 am notification opens this: today's forecast in a popup, readable in full.
@@ -435,8 +481,11 @@ async function renderList() {
   if (!data) return;
   const items = data.items;
   knownIds = items.map((k) => k.kundliId);
+  syncedId = (items.find((k) => k.isMine) || {}).kundliId || '';
   if (items.length === 1) chooseId(items[0].kundliId);
   else if (selectedId && !knownIds.includes(selectedId)) chooseId('');
+  // Someone who chose a person before (the old "This is me" tick, or on another device) keeps that choice here.
+  if (!selectedId && syncedId) chooseId(syncedId);
   // While choosing a person for Ask, Check or Chart the list shows names only; every option stays on the Person tab.
   const pickMode = !!(pickTab && items.length);
   const prof = getProfile();
@@ -445,7 +494,7 @@ async function renderList() {
   app.innerHTML = `<div class="wrap wrap--tabs${pickMode ? '' : ' wrap--home'}">
     <div class="top top--home"><h1>Cosmic Math</h1>${pickMode ? '' : `<div class="top-tools"><button type="button" class="btn-secondary btn-small" id="langBtn" title="Language CosmicMath answers in${lang ? ` (${esc(langName(lang))})` : ''}">Language</button><button class="btn-secondary btn-small signout" id="signOut" title="${esc(who.email ? `Signed in as ${who.email}` : 'Sign out')}">${avatarHtml(who)}Sign out</button></div>`}</div>
     ${pickMode ? `<p class="pick-prompt">Choose a person to continue to ${esc((TABS.find((t) => t[0] === pickTab) || [0, ''])[1])}.</p>` : '<div class="intro-row"><p class="muted">Add yourself and family, then ask CosmicMath about any of them.</p><button type="button" class="btn-primary btn-small" id="addBtn">+ Add a<br>birth chart</button></div>'}
-    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}${k.isMine ? ' <small class="muted">(me)</small>' : ''}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span><label class="tu mine-tick" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" data-mine="${esc(k.kundliId)}" ${k.isMine ? 'checked' : ''} ${items.length === 1 && k.isMine ? 'disabled' : ''} style="width:auto;" /> This is me</label>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
+    ${pickMode ? `<div class="tiles tiles--pick">${items.map((k) => `<div class="tile tile--pick" role="button" tabindex="0" data-open="${esc(k.kundliId)}"><b>${esc(k.name)}</b></div>`).join('')}</div>` : items.length ? `<div class="tiles">${items.map((k) => `<div class="tile tile--compact${k.kundliId === selectedId ? ' tile--selected' : ''}" role="button" tabindex="0" aria-pressed="${k.kundliId === selectedId}" data-select="${esc(k.kundliId)}"><b class="tile-name">${esc(k.name)}</b><span class="tile-actions"><button type="button" class="btn-secondary btn-small" data-edit="${esc(k.kundliId)}">Edit</button><button type="button" class="btn-danger btn-small" data-del="${esc(k.kundliId)}">Delete</button></span><span class="muted tile-line">${esc(fmtBirth(k))}${k.place ? ` &middot; ${esc(k.place)}` : ''}</span>${k.timeUnknown ? `<span class="tile-note">${k.rectification?.status === 'applied' ? `Birth time estimated at ${esc(k.birthTime)} from life events.` : 'Birth time not known, so answers are approximate.'} <button type="button" class="btn-link" data-rectify="${esc(k.kundliId)}">${k.rectification?.status === 'applied' ? 'Redo' : 'Find birth time'}</button></span>` : ''}</div>`).join('')}</div>`
       : `<div class="panel"><p class="muted">No one added yet. Tap &ldquo;Add a birth chart&rdquo; to begin.</p></div>`}
     ${pickMode ? '' : `<div class="home-dock" id="homeDock"><div class="home-dock-inner"><div class="footer-actions"><button type="button" class="btn-primary" id="notifyToggle">Notifications<span class="notify-badge" id="notifyBadge" hidden></span></button><button type="button" class="btn-secondary" id="fbBtn">Feedback or complaint</button></div></div></div>`}
     ${tabBarHtml(pickTab || 'home')}
@@ -464,22 +513,11 @@ async function renderList() {
   document.querySelector('#signOut img.avatar')?.addEventListener('error', (e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar avatar--initial', textContent: initialOf(who) })); });
   onLangChange = null;
   wireFooter();
-  document.getElementById('notifyToggle')?.addEventListener('click', () => openNotifications(items.some((k) => k.isMine)));
-  if (!pickMode) refreshNoticeBadge(items.some((k) => k.isMine));
-  askWhichIsMine(items);
+  document.getElementById('notifyToggle')?.addEventListener('click', openNotifications);
+  if (!pickMode) refreshNoticeBadge();
   if (pendingDaily) openDailyFromLink();
   if (pendingSky) openSkyFromLink();
   document.getElementById('addBtn')?.addEventListener('click', () => openModal(null, renderList));
-  // The tick sits on the tile so nobody has to open a chart to mark it; it must not also open the chart.
-  app.querySelectorAll('[data-mine]').forEach((box) => {
-    box.closest('label').addEventListener('click', (e) => e.stopPropagation());
-    box.addEventListener('keydown', (e) => e.stopPropagation());
-    box.addEventListener('change', async () => {
-      box.disabled = true;
-      try { await call('kundliPublic_setMine', { kundliId: box.dataset.mine, mine: box.checked }); } catch (err) { alert(err.message); }
-      renderList();
-    });
-  });
   app.querySelectorAll('[data-rectify]').forEach((btn) => {
     btn.addEventListener('keydown', (e) => e.stopPropagation());
     btn.addEventListener('click', (e) => { e.stopPropagation(); openRectify(btn.dataset.rectify); });
@@ -545,7 +583,15 @@ let knownIds = [];           // people from the last list load, to check selecte
 let detailId = '';           // the person whose screen is showing now, empty on the list
 const SELECTED_KEY = 'ssa_kundli_selected';
 try { selectedId = localStorage.getItem(SELECTED_KEY) || ''; } catch { /* storage blocked: nobody is remembered */ }
-const chooseId = (id) => { selectedId = id; try { if (id) localStorage.setItem(SELECTED_KEY, id); else localStorage.removeItem(SELECTED_KEY); } catch { /* ignore */ } };
+// The person chosen on Home drives Ask, Check, Chart and the Notifications. The choice is also sent to the server (the one chart it keeps as the person's current one), so the
+// daily 7 am forecast and the Amavasya, Purnima and grahan reminders, which are sent from there, are for the same person.
+let syncedId = '';
+const chooseId = (id) => {
+  selectedId = id;
+  try { if (id) localStorage.setItem(SELECTED_KEY, id); else localStorage.removeItem(SELECTED_KEY); } catch { /* ignore */ }
+  if (id && id !== syncedId) { syncedId = id; call('kundliPublic_setMine', { kundliId: id, mine: true }).catch(() => { syncedId = ''; }); }
+  refreshNoticeBadge();
+};
 const TABS = [['home', 'Home'], ['ask', 'Ask'], ['check', 'Check'], ['chart', 'Chart']];
 const TAB_ICONS = {
   home: '<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/>',

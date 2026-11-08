@@ -409,12 +409,12 @@ body.locked { overflow: hidden; }
 .debt-now { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink); font-size: 11px; font-weight: 600; vertical-align: middle; }
 
 /* Notifications as square tiles, opened in a popup that can be swiped through. */
-.ntiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 12px 0; }
-.ntile { position: relative; aspect-ratio: 1 / 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 4px; padding: 12px; text-align: left; border-radius: 18px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); color: var(--ink); font: inherit; cursor: pointer; overflow: hidden; }
+.ntiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; margin: 10px 0; }
+.ntile { position: relative; min-height: 84px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 2px; padding: 10px 12px; text-align: left; border-radius: 18px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); color: var(--ink); font: inherit; cursor: pointer; overflow: hidden; }
 .ntile:active { transform: scale(0.98); }
-.ntile-icon { font-size: 26px; line-height: 1; }
+.ntile-icon { font-size: 22px; line-height: 1; }
 .ntile b { font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
-.ntile small { font-size: 12px; line-height: 1.3; color: var(--ink-muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ntile small { font-size: 12px; line-height: 1.3; color: var(--ink-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ntile-dot { position: absolute; top: 10px; right: 10px; width: 12px; height: 12px; border-radius: 50%; background: #E5484D; }
 .ntile-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.6); }
 .ntile-panel { width: min(480px, 100%); max-height: 88vh; display: flex; flex-direction: column; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); color: var(--ink); overflow: hidden; touch-action: pan-y; }
@@ -432,3 +432,17 @@ body.locked { overflow: hidden; }
 @keyframes ntile-from-right { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes ntile-from-left { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .ntile-from-right, .ntile-from-left { animation: none; } }
+
+/* The page behind a popup must not scroll with it; the popups keep their own scroll to themselves. */
+.ntile-body, .ntile-panel { overscroll-behavior: contain; }
+.ntile-loc { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
+.ntile-loc-btn { padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.ntile-loc-form { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0 0 10px; }
+.ntile-loc-city { display: flex; gap: 8px; }
+.ntile-loc-city input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: inherit; font: inherit; font-size: 14px; }
+.ntile-loc-err { margin: 0; font-size: 13px; color: #E5484D; }
+
+.ntile-who { margin: 2px 0 6px; font-size: 13px; color: var(--ink-muted); }
+.ntile-for { margin: 0 0 8px; font-size: 13px; color: var(--ink-muted); }
+.ntile-who b, .ntile-for b { color: var(--ink); }
+.ntile-loc-form[hidden], .ntile-loc-err[hidden] { display: none; }
