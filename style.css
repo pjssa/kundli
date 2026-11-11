@@ -476,6 +476,10 @@ body.locked { overflow: hidden; }
 
 .ntile-tablewrap { margin: 8px 0 0; }
 .ntile-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
-.ntile-table th, .ntile-table td { padding: 8px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; line-height: 1.35; }
+.ntile-table th, .ntile-table td { white-space: normal; padding: 8px 4px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; line-height: 1.35; }
 .ntile-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted); }
 .ntile-table small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink-muted); }
+.ntile-table thead th:nth-child(1) { width: 22%; }
+.ntile-table thead th:nth-child(2) { width: 28%; }
+.ntile-table thead th:nth-child(3) { width: 28%; }
+.ntile-table thead th:nth-child(4) { width: 22%; }
