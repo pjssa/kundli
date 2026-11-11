@@ -259,6 +259,11 @@ async function refreshNoticeBadge() {
 // Notifications are shown as square tiles. Tapping one opens it in a popup, and in that popup a swipe from right to left moves to the next tile (left to right, back).
 // The tiles follow the person chosen on Home, like Ask, Check and Chart. The last answer is kept on this device (stale-while-revalidate) so the popup fills at once and
 // then refreshes. Times in Today, Nazar and Good time use the phone's location, or a city typed in, or the birth place.
+// Cells may carry a second line after a newline (stars, how to wear), shown smaller under the first.
+function ntileTable(t) {
+  const cell = (c) => { const [a, ...r] = String(c).split('\n'); return `${esc(a)}${r.length ? `<small>${esc(r.join(' '))}</small>` : ''}`; };
+  return `<div class="ntile-tablewrap"><table class="ntile-table"><thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr>${r.map((c, i) => (i ? `<td>${cell(c)}</td>` : `<th scope="row">${cell(c)}</th>`)).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
 const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '⚖️', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '⏰', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}', metal: '\u{1F517}' };
 const LOC_KEY = 'cm_place', CACHE_KEY = 'cm_notif_cache';
 const loadPlace = () => { try { return JSON.parse(localStorage.getItem(LOC_KEY) || 'null'); } catch { return null; } };
@@ -342,7 +347,7 @@ function buildTiles(r, x) {
     tiles.push({ key: 'debts', events: Object.values(x?.debtCalendar || {}).flat(), icon: TILE_ICONS.debts, title: 'Old debts', hint: r.debts.length ? `${r.debts.length} in the chart${running ? `, ${running} running now` : ''}` : 'None clear in the chart',
       blocks: r.debts.length ? r.debts.map((d) => ({ title: d.title + (d.activeNow ? ' (running now)' : ''), lines: [debtStatus(d), d.why, `Affects: ${d.areasText}`, `Remedy: ${d.remedy}`] })) : [{ lines: ['No clear old debt shows in this chart.'] }] });
   }
-  for (const s of (x?.sections || [])) tiles.push({ key: s.id, events: s.events || [], icon: TILE_ICONS[s.id] || '✨', title: s.title, hint: s.items.slice(0, 2).map((i) => i.title).join(' · '), intro: s.intro, blocks: s.items, locatable: ['today', 'goodtime', 'nazar'].includes(s.id) });
+  for (const s of (x?.sections || [])) tiles.push({ key: s.id, events: s.events || [], icon: TILE_ICONS[s.id] || '✨', title: s.title, hint: s.hint || s.items.slice(0, 2).map((i) => i.title).join(' · '), intro: s.intro, blocks: s.items, locatable: ['today', 'goodtime', 'nazar'].includes(s.id) });
   tiles.forEach((t) => { t.person = person; });
   return tiles;
 }
@@ -361,7 +366,7 @@ function openTileDetail(tiles, start, onOpen, ctl) {
   const draw = (dir) => {
     const t = tiles[i];
     q('.ntile-title').textContent = `${t.icon} ${t.title}`;
-    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
+    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.table ? ntileTable(b.table) : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
     body.scrollTop = 0;
     q('.ntile-count').textContent = `${i + 1} of ${tiles.length}`;
     overlay.querySelectorAll('.ntile-nav').forEach((b) => { b.disabled = (Number(b.dataset.d) < 0 && i === 0) || (Number(b.dataset.d) > 0 && i === tiles.length - 1); });
