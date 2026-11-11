@@ -259,7 +259,7 @@ async function refreshNoticeBadge() {
 // Notifications are shown as square tiles. Tapping one opens it in a popup, and in that popup a swipe from right to left moves to the next tile (left to right, back).
 // The tiles follow the person chosen on Home, like Ask, Check and Chart. The last answer is kept on this device (stale-while-revalidate) so the popup fills at once and
 // then refreshes. Times in Today, Nazar and Good time use the phone's location, or a city typed in, or the birth place.
-const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '⚖️', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '⏰', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}' };
+const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '⚖️', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '⏰', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}', metal: '\u{1F517}' };
 const LOC_KEY = 'cm_place', CACHE_KEY = 'cm_notif_cache';
 const loadPlace = () => { try { return JSON.parse(localStorage.getItem(LOC_KEY) || 'null'); } catch { return null; } };
 const savePlace = (p) => { try { if (p) localStorage.setItem(LOC_KEY, JSON.stringify(p)); else localStorage.removeItem(LOC_KEY); } catch { /* storage unavailable */ } };
@@ -1176,6 +1176,12 @@ function gemExtrasHtml(g, L) {
   return `${why}${per ? `<dt>${esc(lab('gemSupported'))}</dt><dd>${per}</dd>` : ''}${g.startOn ? `<dt>${esc(lab('gemStart'))}</dt><dd>${esc(day(g.startOn.date))}</dd>` : ''}${Array.isArray(g.notWith) && g.notWith.length ? `<dt>${esc(lab('gemNotWith'))}</dt><dd>${g.notWith.map(esc).join(', ')} (${esc(lab('gemNotWithNote'))})</dd>` : ''}`;
 }
 const gemStars = (n) => '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n));
+function metalsHtml(a) {
+  const ms = Array.isArray(a.metals) ? a.metals : [];
+  if (!ms.length) return '';
+  return `<h4 class="h--main">Metals</h4>${ms.map((m) => `<div class="gem"><h5 class="gem-title">${esc(m.metal || '')} · ${esc(m.planet || '')}</h5><dl class="gem-rows">${[['Wear as', m.form], ['Where', m.where], ['Other option', m.alt], ['Start on', m.startOn], ['Benefits', m.benefits]].map(([l, v]) => (v ? `<dt>${l}</dt><dd>${esc(v)}</dd>` : '')).join('')}</dl></div>`).join('')}`;
+}
+
 function gemstoneHtml(a, L) {
   const gems = Array.isArray(a.gemstones) ? a.gemstones : [];
   if (!gems.length) return a.gemstone ? `<h4 class="h--main">${esc(L.gemstone || L_EN.gemstone)}</h4><p>${esc(a.gemstone)}</p>` : '';
@@ -1239,7 +1245,7 @@ function answerHtml(e) {
   const a = unquoteBlank(e.answer || {});
   return `<div class="ans" style="display:flex;flex-direction:column;gap:8px;">
     <div class="msg msg--me"><p>${esc(e.question)}</p>${e.combinedWith?.length ? `<p class="basis" style="color:#d6e8e6;">Combined: ${esc(e.combinedWith.join(', '))}</p>` : ''}</div>
-    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}
+    <div class="msg msg--pandit"><p>${esc(a.answer || a.conclusion || '')}</p>${a.basis ? `<p class="basis">${esc(a.basis)}</p>` : ''}${Array.isArray(a.perPerson) && a.perPerson.length ? `<ul class="perperson">${a.perPerson.map((p) => `<li><b>${esc(p.name)}:</b> ${esc(p.note)}</li>`).join('')}</ul>` : ''}${a.yearView ? `<h4 class="h--main">${esc(a.yearTitle || '')}</h4><p>${esc(a.yearView)}</p>` : ''}${a.started || a.timing ? `<h4 class="h--main">${esc(L.period)}</h4>${a.started ? `<p class="pline"><b>${esc(L.started)}:</b> ${esc(a.started)}</p>` : ''}${a.timing ? `<p class="pline"><b>${esc(L.changes)}:</b> ${esc(a.timing)}</p>` : ''}` : ''}${bestTimingsHtml(a.bestTimings, L, e.lang, a.next)}${muhurtaHtml(a.muhurta, L)}${protectionHtml(a.protection, L)}${vastuHtml(a.vastu, L)}${a.remedy ? `<h4 class="h--main">${esc(L.remedy)}</h4><p>${esc(a.remedy)}</p>` : ''}${gemstoneHtml(a, L)}${metalsHtml(a)}
       ${feedbackHtml(e, L)}
       <div class="msg-actions">${canSpeak ? `<button type="button" class="btn-link del" data-speak="${esc(e.askedAt)}">&#128266; Listen</button>` : '<span></span>'}<button type="button" class="btn-link del" data-del="${esc(e.askedAt)}">Delete</button></div></div>
   </div>`;
