@@ -1327,6 +1327,7 @@ const benCau = (o, max = 99) => {
 // The structured side of a result: which planets suit the matter, which work against it, the totals that would suit, and a folded
 // planet-by-planet table showing how each verdict was reached. Same code on both Kundli surfaces.
 const SUIT_STATUS = { ALIGNED: ['Aligned', 'ok'], SUPPORTIVE: ['Supportive', 'ok'], MIXED: ['Mixed', 'mid'], NEUTRAL: ['Neutral', 'mid'], CONFLICT: ['Against', 'bad'] };
+const SUIT_HOUSE_MEANING = { 6: 'debts, rivals, illness', 8: 'obstacles and sudden setbacks', 12: 'expenses and losses' };
 const suitOrd = (n) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
 function suitEngineHtml(r) {
   const e = r.engine;
@@ -1339,11 +1340,13 @@ function suitEngineHtml(r) {
   if (tc && tc.length) out.push(`<p class="suit-step"><b>Totals that suit</b><br>${tc.slice(0, 14).join(', ')}${tc.length > 14 ? ' and more' : ''}</p>`);
   const rows = e.planetFit.map((p) => {
     const [label, cls] = SUIT_STATUS[p.status] || [p.status, 'mid'];
-    const helps = p.helps.length ? `helps ${p.helps.map((x) => suitOrd(x.house)).join(', ')}` : '';
-    const blocks = p.blocks.length ? `against ${p.blocks.map((x) => suitOrd(x.house)).join(', ')}` : '';
-    return `<li><span class="suit-chip suit-chip--${cls}">${esc(p.planet)} ${p.number}</span> <b>${label}</b>${helps || blocks ? ` &middot; ${[helps, blocks].filter(Boolean).join(', ')}` : ''}</li>`;
+    const matter = r.kind === 'company' ? 'business' : 'money';
+    const houses = (l) => l.map((x) => suitOrd(x.house)).join(', ');
+    const against = p.blocks.map((x) => `${suitOrd(x.house)} (${SUIT_HOUSE_MEANING[x.house] || 'a difficult house'})`).join(', ');
+    const text = [p.helps.length ? `Supports ${matter} (${houses(p.helps)}).` : '', p.blocks.length ? `Pulls against it through ${against}.` : ''].filter(Boolean).join(' ');
+    return `<li><span class="suit-chip suit-chip--${cls}">${esc(p.planet)} ${p.number}</span> <b>${label}</b>${text ? `<br>${esc(text)}` : ''}</li>`;
   }).join('');
-  out.push(`<details class="suit-more"><summary>How this was worked out</summary><p class="muted">Each planet is read by the houses it signifies in your KP chart: through the star of a planet sitting in the house, itself sitting there, the star of the owner, and owning it. Its sub lord counts at half. The 6th house helps earning only partly, as it is also debt and illness.</p><ul class="suit-planets">${rows}</ul></details>`);
+  out.push(`<details class="suit-more"><summary>How this was worked out</summary><p class="muted">Each planet is read by the houses it signifies in your KP chart: through the star of a planet sitting in the house, itself sitting there, the star of the owner, and owning it. Its sub lord counts at half. For a name or mobile the 6th house helps earning only partly, as it is also debt and illness; for a company it counts against.</p><ul class="suit-planets">${rows}</ul></details>`);
   return out.join('');
 }
 
