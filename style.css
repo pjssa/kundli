@@ -483,3 +483,17 @@ body.locked { overflow: hidden; }
 .ntile-table thead th:nth-child(2) { width: 28%; }
 .ntile-table thead th:nth-child(3) { width: 28%; }
 .ntile-table thead th:nth-child(4) { width: 22%; }
+
+/* Name / mobile / company check result: verdict badge, planet chips and the folded planet list. */
+.suit-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.suit-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: rgba(150, 150, 150, .18); }
+.suit-badge--ok { background: rgba(47, 143, 91, .18); color: var(--ok, #2F8F5B); }
+.suit-badge--bad { background: rgba(194, 61, 61, .16); color: var(--danger, #C23D3D); }
+.suit-badge--mid { background: rgba(200, 150, 40, .18); color: var(--accent, #B8860B); }
+.suit-chip { display: inline-block; margin: 2px 6px 2px 0; padding: 1px 9px; border-radius: 999px; font-size: 13px; font-weight: 600; background: rgba(150, 150, 150, .16); }
+.suit-chip--ok { background: rgba(47, 143, 91, .16); color: var(--ok, #2F8F5B); }
+.suit-chip--bad { background: rgba(194, 61, 61, .14); color: var(--danger, #C23D3D); }
+.suit-chip--mid { background: rgba(200, 150, 40, .16); color: var(--accent, #B8860B); }
+.suit-planets { list-style: none; margin: 6px 0 0; padding: 0; }
+.suit-planets li { padding: 4px 0; border-bottom: 1px solid rgba(150, 150, 150, .18); overflow-wrap: anywhere; }
+.suit-planets li:last-child { border-bottom: 0; }

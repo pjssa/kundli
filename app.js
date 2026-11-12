@@ -1272,12 +1272,12 @@ function planetTableHtml(chart) {
 // ---------------------------------------------------------------- add / edit
 
 // ---------------------------------------------------------------- name, mobile number and company check
-const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Co' };
+const SUIT_HINT = { name: 'e.g. Rohit Sharma', mobile: 'e.g. 98765 43210', company: 'e.g. Sharma Trading Pvt Ltd' };
 // The Check tab shows one tile per kind, each with its own box, button and result.
 const SUIT_KINDS = [
   ['name', 'Name check', (n) => `Does the name you use daily suit ${n}? A short verdict, with spelling adjustments.`, 'Name to check'],
   ['mobile', 'Mobile number check', (n) => `Does a mobile number suit ${n}? A short verdict, with the ideal digit total.`, 'Mobile number to check'],
-  ['company', 'Company name check', (n) => `Does a company name suit ${n}? Add the date and place it was incorporated for a deeper reading; no time is needed.`, 'Company name to check'],
+  ['company', 'Company name check', (n) => `Does a company name suit ${n}? Type it complete, with Pvt Ltd or Private Limited as it is written. Add the date and place it was incorporated for a deeper reading; no time is needed.`, 'Company name to check'],
 ];
 function suitTileHtml([kind, title, blurb, label], k) {
   return `<div class="panel suit-tile" data-suit="${kind}">
@@ -1324,14 +1324,38 @@ const benCau = (o, max = 99) => {
   const part = (label, arr) => (arr && arr.length ? `<p class="bc-h"><b>${label}</b></p><ul class="bc-list">${arr.slice(0, max).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '');
   return part('Benefits', o.benefits) + part('Cautions', o.cautions);
 };
+// The structured side of a result: which planets suit the matter, which work against it, the totals that would suit, and a folded
+// planet-by-planet table showing how each verdict was reached. Same code on both Kundli surfaces.
+const SUIT_STATUS = { ALIGNED: ['Aligned', 'ok'], SUPPORTIVE: ['Supportive', 'ok'], MIXED: ['Mixed', 'mid'], NEUTRAL: ['Neutral', 'mid'], CONFLICT: ['Against', 'bad'] };
+const suitOrd = (n) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
+function suitEngineHtml(r) {
+  const e = r.engine;
+  if (!e || !Array.isArray(e.planetFit)) return '';
+  const chip = (p, cls) => `<span class="suit-chip suit-chip--${cls}">${esc(p.planet)} ${p.number}</span>`;
+  const out = [];
+  out.push(`<p class="suit-step"><b>Planets that suit this</b><br>${e.targetBenefics.length ? e.targetBenefics.map((p) => chip(p, 'ok')).join('') : 'None clearly in this chart.'}</p>`);
+  if (e.malefics.length) out.push(`<p class="suit-step"><b>Planets to avoid</b><br>${e.malefics.map((p) => chip(p, 'bad')).join('')}</p>`);
+  const tc = e.corrections && e.corrections.targetCompounds;
+  if (tc && tc.length) out.push(`<p class="suit-step"><b>Totals that suit</b><br>${tc.slice(0, 14).join(', ')}${tc.length > 14 ? ' and more' : ''}</p>`);
+  const rows = e.planetFit.map((p) => {
+    const [label, cls] = SUIT_STATUS[p.status] || [p.status, 'mid'];
+    const helps = p.helps.length ? `helps ${p.helps.map((x) => suitOrd(x.house)).join(', ')}` : '';
+    const blocks = p.blocks.length ? `against ${p.blocks.map((x) => suitOrd(x.house)).join(', ')}` : '';
+    return `<li><span class="suit-chip suit-chip--${cls}">${esc(p.planet)} ${p.number}</span> <b>${label}</b>${helps || blocks ? ` &middot; ${[helps, blocks].filter(Boolean).join(', ')}` : ''}</li>`;
+  }).join('');
+  out.push(`<details class="suit-more"><summary>How this was worked out</summary><p class="muted">Each planet is read by the houses it signifies in your KP chart: through the star of a planet sitting in the house, itself sitting there, the star of the owner, and owning it. Its sub lord counts at half. The 6th house helps earning only partly, as it is also debt and illness.</p><ul class="suit-planets">${rows}</ul></details>`);
+  return out.join('');
+}
+
 function suitabilityHtml(r) {
   // Short on purpose: one headline, then one tight paragraph per step (numbers first, then the KP verdict), so a result is a few lines, not a page.
-  const out = [`<p><b>${esc(r.input)}</b>: <b>${esc(r.verdict)}</b></p>`];
+  const out = [`<p class="suit-head"><b>${esc(r.input)}</b> <span class="suit-badge suit-badge--${r.verdict === 'Favourable' ? 'ok' : r.verdict === 'Unfavourable' ? 'bad' : 'mid'}">${esc(r.verdict)}</span></p>`];
   for (const b of r.blocks || []) {
     const body = (b.lines || []).map((t) => esc(t)).join('<br>');
     const items = b.items && b.items.length ? `${body ? '<br>' : ''}${b.items.map((t) => `&bull; ${esc(t)}`).join('<br>')}` : '';
     out.push(`<p class="suit-step"><b>${esc(b.title)}${b.tag ? `: ${esc(b.tag)}` : ''}</b>${body || b.items?.length ? '<br>' : ''}${body}${items}</p>`);
   }
+  out.push(suitEngineHtml(r));
   // A company with a date of incorporation keeps its chart (Moon, this year, life periods, growth line), folded away until asked for.
   const cc = r.companyChart;
   if (cc) {
