@@ -354,6 +354,25 @@ function buildTiles(r, x) {
 function tilesGridHtml(tiles) {
   return `<div class="ntiles">${tiles.map((t, i) => `<button type="button" class="ntile" data-i="${i}"><span class="ntile-icon" aria-hidden="true">${t.icon}</span><b>${esc(t.title)}</b><small>${esc(t.hint)}</small>${t.unseen ? '<span class="ntile-dot" aria-label="New"></span>' : ''}</button>`).join('')}</div>`;
 }
+// "Ask more" on an Information result: the Ask screen opens for the chosen person with this question already typed in the box, for the person to
+// edit and send (same as tapping a suggested question). Worded per tile so the answer is about that remedy, not the whole tile. Mirrors KundliReading.js.
+function askQuestion(tile, block) {
+  const title = block && block.title ? block.title.replace(/\s*\(running now\)$/, '') : '';
+  if (!title) return `Tell me more about "${tile.title}" for me: why it applies to my chart and what I should do.`;
+  if (tile.key === 'nazar') return `Tell me more about this nazar remedy for me: ${title}. Why does my chart need it, and how exactly should I do it?`;
+  if (tile.key === 'vastu') return `Tell me more about this Vastu advice for me: ${title}. Why does it suit my chart?`;
+  if (tile.key === 'goodtime') return `Tell me more about the good time to start: ${title}. Which day and time suit me best, and why?`;
+  if (tile.key === 'changes') return `Tell me more about the ${title.toLowerCase()} in my chart. What do they mean for me and what should I do?`;
+  return `Tell me more about "${title}" (${tile.title}) for me.`;
+}
+let pendingQuestion = '';    // a question waiting to be put in the Ask box once that screen is drawn
+let fillAsk = null;          // puts text in the Ask box of the screen now showing
+function askFromInfo(question) {
+  if (!selectedId) return;
+  pendingQuestion = question;
+  if (detailId === selectedId && fillAsk && document.getElementById('q')) { showTab('ask'); const q = pendingQuestion; pendingQuestion = ''; fillAsk(q); window.scrollTo(0, 0); return; }
+  goTab('ask');
+}
 function openTileDetail(tiles, start, onOpen, ctl) {
   let i = start;
   const overlay = document.createElement('div');
@@ -362,11 +381,16 @@ function openTileDetail(tiles, start, onOpen, ctl) {
   document.body.appendChild(overlay);
   lockScroll();
   const q = (sel) => overlay.querySelector(sel), body = q('.ntile-body');
+  const askQs = [];
   const locHtml = () => `<div class="ntile-loc"><span>\u{1F4CD} Times for <b>${esc(ctl.label || 'the birth place')}</b></span><button type="button" class="ntile-loc-btn" data-act="toggle">Change</button></div><div class="ntile-loc-form" hidden><div class="ntile-loc-city"><input type="text" placeholder="Type a city" aria-label="City" /><button type="button" class="ntile-loc-btn" data-act="city">Set</button></div><p class="ntile-loc-err" hidden></p></div>`;
   const draw = (dir) => {
     const t = tiles[i];
     q('.ntile-title').textContent = `${t.icon} ${t.title}`;
-    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.table ? ntileTable(b.table) : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}`).join('');
+    askQs.length = 0;
+    const askBtn = (question) => { askQs.push(question); return `<button type="button" class="btn-secondary ntile-ask" data-ask="${askQs.length - 1}">Ask more</button>`; };
+    const canAsk = !!ctl?.askMore && !!t.person;
+    // One button under each titled result (each remedy), or a single one at the end of a tile whose results have no titles.
+    body.innerHTML = (t.person ? `<p class="ntile-for">For <b>${esc(t.person)}</b></p>` : '') + (t.locatable && ctl ? locHtml() : '') + (t.intro ? `<p class="muted">${esc(t.intro)}</p>` : '') + t.blocks.map((b) => `${b.title ? `<h4>${esc(b.title)}</h4>` : ''}${b.table ? ntileTable(b.table) : ''}${b.lines.map((l) => `<p>${esc(l)}</p>`).join('')}${canAsk && b.title ? askBtn(askQuestion(t, b)) : ''}`).join('') + (canAsk && !t.blocks.some((b) => b.title) ? askBtn(askQuestion(t, null)) : '');
     body.scrollTop = 0;
     q('.ntile-count').textContent = `${i + 1} of ${tiles.length}`;
     overlay.querySelectorAll('.ntile-nav').forEach((b) => { b.disabled = (Number(b.dataset.d) < 0 && i === 0) || (Number(b.dataset.d) > 0 && i === tiles.length - 1); });
@@ -375,6 +399,8 @@ function openTileDetail(tiles, start, onOpen, ctl) {
     onOpen?.(t, i);
   };
   body.addEventListener('click', async (e) => {
+    const ask = e.target.closest('[data-ask]');
+    if (ask && ctl?.askMore) { const question = askQs[Number(ask.dataset.ask)]; close(); ctl.askMore(question); return; }
     const b = e.target.closest('[data-act]');
     if (!b || !ctl) return;
     const form = body.querySelector('.ntile-loc-form'), err = body.querySelector('.ntile-loc-err');
@@ -408,7 +434,7 @@ function openTileDetail(tiles, start, onOpen, ctl) {
 // Fills the tile grid: from the saved copy at once, then from the server. apiNotices and apiExtras take the payload and return the server answer.
 function startNotifyLoad(list, apiNotices, apiExtras, apiCalendar, ui) {
   let place = loadPlace(), notices = null, extras = null;
-  const tiles = [], ctl = { label: '' };
+  const tiles = [], ctl = { label: '', askMore: (question) => { ui?.close?.(); askFromInfo(question); } };
   const sel = () => selectedId;
   const placeKey = () => (place ? (place.city || `${place.lat},${place.lon}`) : 'birth');
   const cacheKey = () => `${sel()}|${placeKey()}`;
@@ -510,7 +536,7 @@ function openNotifications() {
     $('#nTest').onclick = () => run($('#nTest'), () => call('kundliPublic_pushTest'));
   };
   draw();
-  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p), null, { bar: $('#nBar'), msg: $('#nAllMsg'), title: $('#nTitle') });
+  startNotifyLoad($('#nList'), (p) => call('kundliPublic_notices', p), (p) => call('kundliPublic_notifyExtras', p), null, { bar: $('#nBar'), msg: $('#nAllMsg'), title: $('#nTitle'), close: closeIt });
 }
 
 // The 7 am notification opens this: today's forecast in a popup, readable in full.
@@ -896,6 +922,8 @@ async function renderDetail(kundliId) {
   });
   const grow = () => { qBox.style.height = 'auto'; qBox.style.height = `${Math.min(qBox.scrollHeight, 140)}px`; };
   qBox.addEventListener('input', grow);
+  // Used by "Ask more" on an Information result: replaces what was typed with that question and leaves the cursor at its end.
+  fillAsk = (text) => { qBox.value = text; grow(); syncChips(); qBox.focus(); qBox.setSelectionRange(text.length, text.length); };
 
   // Keeps the chat alive: after every answer (and on an empty chat) a teaser and three tappable next questions sit at the bottom of the thread.
   // Shown in the chat when the personal opening cannot be prepared, so a new person still has questions to tap.
@@ -927,6 +955,8 @@ async function renderDetail(kundliId) {
   };
   const syncChips = (scope = thread) => scope.querySelectorAll('.fu-chip').forEach((c) => c.setAttribute('aria-pressed', String(qBox.value.includes(c.textContent))));
   qBox.addEventListener('input', () => syncChips());
+  // Arrived here from "Ask more" on an Information result: the question is waiting, so type it in now that the box exists.
+  if (pendingQuestion) { const waiting = pendingQuestion; pendingQuestion = ''; fillAsk(waiting); }
   // The "i" button: ten ideas per topic. Tapping adds them to the question box (several can be joined); asked ones drop out and new ones appear next time.
   document.getElementById('ideas').addEventListener('click', () => {
     const o = document.createElement('div');

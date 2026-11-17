@@ -446,6 +446,8 @@ body.locked { overflow: hidden; }
 
 .ntile-who { margin: 2px 0 6px; font-size: 13px; color: var(--ink-muted); }
 .ntile-for { margin: 0 0 8px; font-size: 13px; color: var(--ink-muted); }
+/* "Ask more" under each Information result (same look as the in-app .kundli-ntile-ask). */
+.ntile-ask { margin: 4px 0 14px; padding: 6px 14px; font-size: 13px; }
 .ntile-who b, .ntile-for b { color: var(--ink); }
 .ntile-loc-form[hidden], .ntile-loc-err[hidden] { display: none; }
 
