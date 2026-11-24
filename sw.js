@@ -17,7 +17,7 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 
 // Tapping a push. On an iPhone the app is brought up only by opening a window from inside this handler: finding the already-open (often
 // suspended) window and calling focus() can resolve without showing anything, which looked like "I tapped it and nothing happened".
-// So an iPhone always opens the page with ?daily=1 or ?sky=1, which shows the message in a popup after loading. Elsewhere an open app
+// So an iPhone always opens the page with ?daily=1, ?sky=1 or ?headsup=1, which shows the message in a popup after loading. Elsewhere an open app
 // gets the message at once and a closed one opens the same link; if focusing fails the link is opened instead.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

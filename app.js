@@ -264,7 +264,7 @@ function ntileTable(t) {
   const cell = (c) => { const [a, ...r] = String(c).split('\n'); return `${esc(a)}${r.length ? `<small>${esc(r.join(' '))}</small>` : ''}`; };
   return `<div class="ntile-tablewrap"><table class="ntile-table"><thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr>${r.map((c, i) => (i ? `<td>${cell(c)}</td>` : `<th scope="row">${cell(c)}</th>`)).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', debts: '⚖️', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '⏰', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}', metal: '\u{1F517}' };
+const TILE_ICONS = { daily: '\u{1F305}', sky: '\u{1F319}', headsup: '\u{26A0}\u{FE0F}', debts: '⚖️', today: '\u{1F4C5}', changes: '\u{1F504}', festivals: '\u{1FA94}', goodtime: '⏰', nazar: '\u{1F9FF}', vastu: '\u{1F3E0}', gemstone: '\u{1F48E}', metal: '\u{1F517}' };
 const LOC_KEY = 'cm_place', CACHE_KEY = 'cm_notif_cache';
 const loadPlace = () => { try { return JSON.parse(localStorage.getItem(LOC_KEY) || 'null'); } catch { return null; } };
 const savePlace = (p) => { try { if (p) localStorage.setItem(LOC_KEY, JSON.stringify(p)); else localStorage.removeItem(LOC_KEY); } catch { /* storage unavailable */ } };
@@ -561,6 +561,13 @@ async function openDailyFromLink() {
 }
 // The Amavasya, Purnima and grahan reminder opens the same popup with the next such day for the person's own chart.
 let pendingSky = new URLSearchParams(location.search).has('sky');
+// The heads-up before a difficult stretch opens the Information panel, where its tile is listed with the dates and what to take care of.
+let pendingHeadsUp = new URLSearchParams(location.search).has('headsup');
+function openHeadsUpFromLink() {
+  pendingHeadsUp = false;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
+  openNotifications();
+}
 async function openSkyFromLink() {
   pendingSky = false;
   try { history.replaceState(null, '', location.pathname + location.hash); } catch { /* ignore */ }
@@ -616,6 +623,7 @@ async function renderList() {
   if (!pickMode) { refreshNoticeBadge(); autoPlace(); }
   if (pendingDaily) openDailyFromLink();
   if (pendingSky) openSkyFromLink();
+  if (pendingHeadsUp && !pickMode) openHeadsUpFromLink();
   document.getElementById('addBtn')?.addEventListener('click', () => openModal(null, renderList));
   app.querySelectorAll('[data-rectify]').forEach((btn) => {
     btn.addEventListener('keydown', (e) => e.stopPropagation());
