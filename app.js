@@ -1681,5 +1681,22 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); inst
 window.addEventListener('appinstalled', () => document.getElementById('installPop')?.remove());
 installPopup();
 // A tapped notification should not wait for the home list to load first: when already signed in, the popup starts at once.
+const openedByLink = pendingDaily || pendingSky || pendingHeadsUp;
 if (getSession() || currentToken()) { if (pendingDaily) openDailyFromLink(); else if (pendingSky) openSkyFromLink(); }
+// iPhone home-screen apps often drop the ?daily=1 part of the link on a tap and just open the app, so the service worker also leaves a note saying which push
+// was tapped (sw.js). Read it on launch and whenever the app comes back to the front; when the link already did the job the note is only cleared.
+async function applyTapNote(handledByLink) {
+  let kind = '';
+  try {
+    const c = await caches.open('cm-tap'), r = await c.match('/__tap');
+    if (r) { await c.delete('/__tap'); const t = await r.json(); if (Date.now() - t.at < 10 * 60000) kind = t.kind; }
+  } catch { /* no Cache API: the link alone has to do */ }
+  if (!kind || handledByLink) return;
+  if (kind === 'daily') pendingDaily = true; else if (kind === 'sky') pendingSky = true; else if (kind === 'headsup') pendingHeadsUp = true;
+  // Not signed in yet: the flag waits, and Home opens it right after sign-in.
+  if (!(getSession() || currentToken())) return;
+  if (pendingDaily) openDailyFromLink(); else if (pendingSky) openSkyFromLink(); else if (pendingHeadsUp && document.getElementById('notifyToggle')) openHeadsUpFromLink();
+}
+applyTapNote(openedByLink);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') applyTapNote(false); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* installing still works from the browser menu */ });

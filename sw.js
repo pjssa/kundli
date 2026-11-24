@@ -1,4 +1,4 @@
-// Present only so browsers treat the page as installable; it caches nothing and never answers a request itself,
+// Present only so browsers treat the page as installable; it caches no pages and never answers a request itself,
 // so every visit still loads the latest files and the live API.
 self.addEventListener('fetch', () => {});
 
@@ -24,6 +24,12 @@ self.addEventListener('notificationclick', (event) => {
   const n = event.notification;
   const url = new URL(n.data?.url || '/', self.location.origin).href;
   event.waitUntil((async () => {
+    // iPhone home-screen apps often drop the ?daily=1 part of the link and just open the app, so which push was tapped is also left as a short-lived
+    // note for the page to read when it opens (app.js applyTapNote). The only thing this file ever stores; it is deleted as soon as it is read.
+    try {
+      const kind = ['daily', 'sky', 'headsup'].find((k) => new URL(url).searchParams.has(k));
+      if (kind) await (await caches.open('cm-tap')).put('/__tap', new Response(JSON.stringify({ kind, at: Date.now() })));
+    } catch { /* the link alone has to do */ }
     // An already-open (often suspended) app ignores openWindow on iOS and a bare focus() can resolve without showing anything,
     // which was the "I tapped it and nothing happened" report. Navigating that window to the ?daily=1 link makes it load and show
     // the popup itself; only when no window exists is a new one opened.
