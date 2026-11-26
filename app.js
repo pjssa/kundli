@@ -187,6 +187,27 @@ async function guarded(fn) {
   }
 }
 
+// A phone suspends a request the moment the app is left, and the browser then reports "Load failed" although the server usually still
+// finishes and saves the answer. So after a network failure wait until the app is back in front, look for the saved answer, and only
+// resend if it never arrived.
+const isNetworkError = (e) => e instanceof TypeError || /load failed|failed to fetch|network ?error|network connection/i.test(String((e && e.message) || ''));
+const whenVisible = () => (document.visibilityState === 'visible' ? Promise.resolve() : new Promise((res) => { const on = () => { if (document.visibilityState === 'visible') { document.removeEventListener('visibilitychange', on); res(); } }; document.addEventListener('visibilitychange', on); }));
+async function askSurvivingBackground(send, loadHistory, question) {
+  const sentAt = Date.now() - 10000;
+  try { return await send(); } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    await whenVisible();
+    for (let i = 0; i < 8; i++) {
+      try {
+        const found = (await loadHistory() || []).find((x) => x.question === question && Date.parse(x.askedAt) >= sentAt);
+        if (found) return { entry: found };
+      } catch { /* still offline; try again */ }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return send();
+  }
+}
+
 // ---------------------------------------------------------------- list
 
 const initialOf = (w) => (String(w.name || w.email || '?').trim()[0] || '?').toUpperCase();
@@ -1033,7 +1054,7 @@ async function renderDetail(kundliId) {
       box.innerHTML = '<p class="muted">CosmicMath is studying the charts&hellip;</p>';
       try {
         const place = (await askPlace(question)) || undefined;
-        const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined, place }));
+        const out = await askSurvivingBackground(() => guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, kundliIds: ids, language: lang || undefined, place })), () => call('kundliPublic_get', { kundliId: k.kundliId }).then((d) => d.history), question);
         thread.querySelectorAll('.pending, .picker').forEach((n) => n.remove());
         if (!out) return;
         commitLeft(); hist.unshift(out.entry); landOnAnswer = true;
@@ -1083,7 +1104,7 @@ async function renderDetail(kundliId) {
         }
       }
       const place = (await askPlace(question)) || undefined;
-      const out = await guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined, place }));
+      const out = await askSurvivingBackground(() => guarded(() => call('kundliPublic_ask', { kundliId: k.kundliId, question, language: lang || undefined, place })), () => call('kundliPublic_get', { kundliId: k.kundliId }).then((d) => d.history), question);
       dropPending();
       if (!out) return;
       commitLeft(); hist.unshift(out.entry); landOnAnswer = true;
